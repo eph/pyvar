@@ -56,7 +56,7 @@ class NormInvWishart(object):
     def __init__(self, mu, omega, psi, nu):
 
         self.iw = InvWishart(psi, nu)
-        self.mu = mu.flatten(order='F')
+        self.mu = mu.flatten()
         self.omega = omega
         self.inv_omega = np.linalg.inv(omega)
         self.n = mu.size
@@ -81,7 +81,7 @@ class NormInvWishart(object):
         return np.array(betas), np.array(sigmas)
 
     def logpdf(self, BETA, SIGMA):
-        BETA = BETA.flatten(order='F')
+        BETA = BETA.flatten()
         mvn_covar = np.kron(SIGMA, self.inv_omega)
         _, logdet = np.linalg.slogdet(mvn_covar)
         

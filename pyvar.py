@@ -5,28 +5,13 @@ import sys
 
 from var_data import var_data, real_time_dataset
 from mcmc import MCMC
-from varprior import DiffusePrior, MinnesotaPrior, Prior
+from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans
 from forecast_evaluation import PredictiveDensity
 import matplotlib.pyplot as plt
 from distributions import NormInvWishart
 from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
-
-def to_phi_sigma(f):
-    def wrapper(*args):
-        if len(args) > 2:
-            return f(*args)
-        else:
-            theta = args[1]
-            nphi = args[0].n**2*args[0].p + args[0].n*(args[0].cons is True)
-            BETA = np.reshape(theta[:nphi], (args[0].n, args[0].n*args[0].p + 1*(args[0].cons is True))).T
-            SIGMA = 1
-            return f(args[0], BETA, SIGMA)
-    return wrapper
-
-
-
 
 
 
@@ -51,7 +36,9 @@ class VAR(object):
         VAR object.
         """
         self._ny, self._p, self._cons = ny, p, cons
-        
+        self.n = ny
+        self.p = p
+        self.cons = cons
         
     @staticmethod
     def simulate_data(phi, sigma, cons=True, n=100):
@@ -69,7 +56,6 @@ class VAR(object):
         """
         phi = np.asarray(phi, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
-        print sigma.shape, sigma
         ny = sigma.shape[0]
 
 
@@ -122,21 +108,22 @@ class BayesianVAR(VAR):
     """A class for Bayesian VARs."""
 
 
-    def __init__(self, prior):
+    def __init__(self, prior, y):
         """Initialization."""
         self._prior = prior
-        
+        self.data = y
+        self.sigma_choose = prior.sigma_choose
         super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
-
-
         
-    def sample(self, y, nsim=1000):
+    def sample(self, nsim=1000, y=None):
 
+        if y is None:
+            y = self.data
 
         ydum, xdum = self._prior.get_pseudo_obs()
         xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
 
-        if self._cons is True:
+        if self._cons is True:  
             xest = add_constant(xest, prepend=False)
         
         if not ydum == None:
@@ -145,8 +132,8 @@ class BayesianVAR(VAR):
 
         
         # This is just a random initialization point....
-        phihatT = np.linalg.solve(xest.T * xest, xest.T * yest)
-        S = (yest - xest * phihatT).T * (yest - xest * phihatT)
+        phihatT = np.linalg.solve(xest.T.dot(xest), xest.T.dot(yest))
+        S = (yest - xest * phihatT).T.dot(yest - xest * phihatT)
         nu = yest.shape[0] - yest.shape[1] * self._ny + self._cons
 
         omega = xest.T*xest
@@ -174,11 +161,31 @@ class BayesianVAR(VAR):
     def to_phi_sigma(self):
         return self._prior.to_phi_sigma
 
-    def logmdd(self, y):
+    def mle(self, y=None):
+        """MLE."""
+        if y is None:
+            y = self.data
+
+        x, y = lagmat(y, maxlag=self._p, trim="both", original="sep")
+
+        if self._cons is True:
+            x = add_constant(x, prepend=False)
+            
+        beta = np.linalg.solve(x.T.dot(x), x.T.dot(y))
+        S = (y - x.dot(beta)).T.dot(y - x.dot(beta))
+
+        return (beta, S)
+
+
+    def logmdd(self, y=None):
         """Computes the log of marginal data density."""
         # if not isinstance(self._prior, "DummyVarPrior"):
         #     print "Can only be computed analytically for DummyVarPriors."
         #     return 
+
+        if y is None:
+            y = self.data
+
 
         ydum, xdum = self._prior.get_pseudo_obs()
         xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
@@ -222,11 +229,30 @@ class BayesianVAR(VAR):
 
         return lnpy
             
-    def loglik(BETA, SIGMA):
-        pass
+    @para_trans
+    def loglik(self, Phi, Sigma, y=None):
+        if y is None:
+            y = self.data
+        
+        xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
+        if self._cons is True:
+            xest = add_constant(xest, prepend=False)
+            
 
+        T = yest.shape[0]
 
+        (phi_hat, s_hat) = self.mle(y)
+        
+        Sigma_inv = np.linalg.inv(Sigma)
+        phi_delta = Phi - phi_hat
 
+        XtX = xest.T.dot(xest)
+        lik = (-T/2*np.log(np.linalg.det(Sigma))
+               -0.5*(Sigma_inv.dot(s_hat)).trace()
+               -0.5*(Sigma_inv.dot(phi_delta.T).dot(XtX).dot(phi_delta)).trace())
+               
+        return lik
+        
 
 class CompleteModel(BayesianVAR):
     """
@@ -240,17 +266,6 @@ class CompleteModel(BayesianVAR):
         self.__dict__ = bvar.__dict__   # this might be the best way to do this
         self.y = y
 
-    def mle(self):
-        """MLE."""
-        y = self.data
-        x = y.mlag(self._p, self._cons)
-
-        x, y = x[self._p:, :], y.series[self._p:, :]
-
-        beta = np.linalg.solve(x.T * x, x.T * y)
-        S = (y - x * beta).T * (y - x * beta)
-
-        return (beta, S)
 
     def loglk(self, para):
         """Returns the log likelihood evaluated at (phi, sigma)."""

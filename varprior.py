@@ -19,6 +19,23 @@ class DummyVarPrior(Prior):
     def get_pseudo_obs(self):
         return None
 
+def para_trans(f):
+    def reshaped_f(self, *args, **kwargs):
+        if len(args) == 1:
+            theta = args[0]
+            n = self.n
+            p = self.p
+            cons = self.cons
+            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n))
+            Sigma = theta[n**2*p+n*(cons==True):]
+            Sigma = np.choose(self.sigma_choose, Sigma)
+        else:
+            Phi = args[0]
+            Sigma = args[1]
+        return f(self, Phi, Sigma, **kwargs)
+    return reshaped_f
+    
+
 class MinnesotaPrior(DummyVarPrior):
     """A class for the Minnesota Prior."""
     def __init__(self, ypre, hyperpara, p=3, cons=True, presample_moments=None, lamxx=None):
@@ -64,7 +81,29 @@ class MinnesotaPrior(DummyVarPrior):
 
         self.n = ny;
         self.p = p;
-        self.cons=cons;
+        self.cons = cons;
+
+        n = ny
+        max_n = ny*(ny+1)/2
+        x = range(int(max_n))
+        z = np.zeros((ny, ny), dtype=int)
+
+        
+        dist = n
+        ind = 0
+
+        for i in range(n):
+            # z[0:n-i, i:n] = x[ind:ind+dist]
+            # z[i:n, 0:n-i] = x[ind:ind+dist]
+            #z[range(0, n-i), range(i, n)] = x[ind:ind+dist]
+            #z[range(i, n), range(0, n-i)] = x[ind:ind+dist]
+            z[i, i:] = x[ind:ind+dist]
+            z[i:, i] = x[ind:ind+dist]
+            ind += dist
+            dist -= 1
+
+        self.sigma_choose = z
+
 
         dumr = ny * 2 + lam3*ny + ny * (p-1) + 1
         self.__dumy = np.mat(np.zeros((dumr, ny)))
@@ -109,7 +148,7 @@ class MinnesotaPrior(DummyVarPrior):
         if cons:
             self.__dumx[subt, -1] = lam5
 
-        # Add Mark's thing (NOT IS DNS)
+        # Add Mark's thing (NOT IN DNS)
         if lamxx is not None:
             self.__dumy = np.vstack((self.__dumy, np.zeros((ny))))
             x = np.zeros((ny*p+cons))
@@ -133,10 +172,14 @@ class MinnesotaPrior(DummyVarPrior):
     def nu(self):
         return (self.__dumy.shape[0] - self.__dumx.shape[1])
         
-    def rvs(self, ndraw=1):
-        return NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu).rvs(ndraw)
+    def rvs(self, size=1, flatten_output=True):
+        phis, sigmas = NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu).rvs(size)
+        if flatten_output:
+            return np.array([np.r_[phis[i].flatten(), vech(sigmas[i])] for i in range(size)])
+        else:
+            return phis, sigmas
 
-
+    @para_trans
     def logpdf(self, Phi, Sigma):
         return NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu).logpdf(Phi, Sigma)
 
@@ -145,12 +188,15 @@ class MinnesotaPrior(DummyVarPrior):
     def get_pseudo_obs(self):
         return self.__dumy, self.__dumx
 
-    def theta(Phi, Sigma):
-        return r_[vec(Phi), vech(Sigma)]
+    def theta(self, Phi, Sigma):
+        return np.r_[Phi.flatten(), vech(Sigma)]
         
     def inv_theta(theta):
         pass 
 
+
+            
+        
 
 class DiffusePrior(DummyVarPrior):
 
