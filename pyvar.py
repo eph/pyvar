@@ -3,9 +3,10 @@ import numpy as np
 import numpy.matlib as M
 import sys
 
-from var_data import var_data, real_time_dataset
+#from var_data import var_data, real_time_dataset
 from mcmc import MCMC
 from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans
+from statsmodels.tsa.tsatools import vec, vech
 from forecast_evaluation import PredictiveDensity
 import matplotlib.pyplot as plt
 from distributions import NormInvWishart
@@ -39,11 +40,11 @@ class VAR(object):
         self.n = ny
         self.p = p
         self.cons = cons
-        
+
     @staticmethod
     def simulate_data(phi, sigma, cons=True, n=100):
         """
-        Takes a given VAR parameterization and simulates data, starting at the implied unconditional mean.  
+        Takes a given VAR parameterization and simulates data, starting at the implied unconditional mean.
 
         Keyword Arguments:
         phi -- A matrix ..math:: k\times n where ..math::k=np+1 or ..math::k=np depending on whether or not a constant is included.  The matrix is populated as
@@ -59,7 +60,7 @@ class VAR(object):
         ny = sigma.shape[0]
 
 
-        
+
         if cons:
             p = (phi.shape[0] - 1) / ny
         else:
@@ -102,8 +103,8 @@ class StructuralPrior:
         ret_str = r"A Vector Autoregression of the form:\n"
         ret_str += r"\[ y_t\'A_0 = x_t\'A_{+} + \varepsilon_t. \]"
         return ret_str
-        
-        
+
+
 class BayesianVAR(VAR):
     """A class for Bayesian VARs."""
 
@@ -114,8 +115,8 @@ class BayesianVAR(VAR):
         self.data = y
         self.sigma_choose = prior.sigma_choose
         super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
-        
-    def sample(self, nsim=1000, y=None):
+
+    def sample(self, nsim=1000, y=None,flatten_output=False):
 
         if y is None:
             y = self.data
@@ -123,23 +124,28 @@ class BayesianVAR(VAR):
         ydum, xdum = self._prior.get_pseudo_obs()
         xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
 
-        if self._cons is True:  
+        if self._cons is True:
             xest = add_constant(xest, prepend=False)
-        
+
         if not ydum == None:
             yest = np.vstack((ydum, yest))
             xest = np.vstack((xdum, xest))
 
-        
+
         # This is just a random initialization point....
         phihatT = np.linalg.solve(xest.T.dot(xest), xest.T.dot(yest))
         S = (yest - xest * phihatT).T.dot(yest - xest * phihatT)
-        nu = yest.shape[0] - yest.shape[1] * self._ny + self._cons
-
+        nu = yest.shape[0] - self._p * self._ny - self._cons*1
         omega = xest.T*xest
-        muphi = np.ravel(phihatT)
-        
-        phis, sigmas = NormInvWishart(muphi, omega, S, nu).rvs(nsim)
+        muphi = phihatT#.flatten()#np.ravel(phihatT)
+
+        phis, sigmas = NormInvWishart(phihatT, omega, S, nu).rvs(nsim)
+
+        if flatten_output:
+            return np.array([np.r_[phis[i].flatten(order='F'), vech(sigmas[i])] for i in range(nsim)])
+        else:
+            return phis, sigmas
+
 
         return phis, sigmas
 
@@ -170,9 +176,10 @@ class BayesianVAR(VAR):
 
         if self._cons is True:
             x = add_constant(x, prepend=False)
-            
+
         beta = np.linalg.solve(x.T.dot(x), x.T.dot(y))
-        S = (y - x.dot(beta)).T.dot(y - x.dot(beta))
+        S = (y - x.dot(beta)).T.dot(y - x.dot(beta))/y.shape[0]
+
 
         return (beta, S)
 
@@ -181,7 +188,7 @@ class BayesianVAR(VAR):
         """Computes the log of marginal data density."""
         # if not isinstance(self._prior, "DummyVarPrior"):
         #     print "Can only be computed analytically for DummyVarPriors."
-        #     return 
+        #     return
 
         if y is None:
             y = self.data
@@ -197,7 +204,6 @@ class BayesianVAR(VAR):
         if self._cons is True:
             xest = add_constant(xest, prepend=False)
 
-        
         yest = np.vstack((ydum, yest))
         xest = np.vstack((xdum, xest))
 
@@ -207,7 +213,7 @@ class BayesianVAR(VAR):
         phihatT = np.linalg.solve(xest.T * xest, xest.T * yest)
         S = (yest - xest * phihatT).T.dot(yest - xest * phihatT)
         _, logdets    = np.linalg.slogdet(S)
-        
+
         phidumT = np.linalg.solve(xdum.T * xdum, xdum.T * ydum)
         Sdum = (ydum - xdum * phidumT).T.dot (ydum - xdum * phidumT)
         _, logdetsdum = np.linalg.slogdet(Sdum)
@@ -220,39 +226,44 @@ class BayesianVAR(VAR):
             kap += gammaln( (Tbar - k - i)/2.0 )
             kapdum += gammaln( (Tstar - k - i)/2.0 )
 
-        lnpy = (-self._n*T/2.0*np.log(2.0*np.pi) 
+        lnpy = (-self._n*T/2.0*np.log(np.pi)
                 -self._n/2.0*logdetx -(Tbar - k)/2.0*logdets
-                +self._n*(Tbar - k)/2.0*np.log(2.0)
+                #+self._n*(Tbar - k)/2.0*np.log(2.0)
                 + kap - kapdum
                 + self._n/2.0*logdetxdum + (Tstar - k)/2.0*logdetsdum
-                -self._n*(Tstar - k)/2.0*np.log(2.0) )
-
+                #-self._n*(Tstar - k)/2.0*np.log(2.0) )
+                )
         return lnpy
-            
+
     @para_trans
     def loglik(self, Phi, Sigma, y=None):
         if y is None:
             y = self.data
-        
+
         xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
         if self._cons is True:
             xest = add_constant(xest, prepend=False)
-            
 
-        T = yest.shape[0]
+
+        T,n = yest.shape
 
         (phi_hat, s_hat) = self.mle(y)
-        
+
+        s_hat = T*s_hat
         Sigma_inv = np.linalg.inv(Sigma)
         phi_delta = Phi - phi_hat
 
         XtX = xest.T.dot(xest)
-        lik = (-T/2*np.log(np.linalg.det(Sigma))
+        lik = (-T*n/2*np.log(2*np.pi)
+               -T/2*np.log(np.linalg.det(Sigma))
                -0.5*(Sigma_inv.dot(s_hat)).trace()
                -0.5*(Sigma_inv.dot(phi_delta.T).dot(XtX).dot(phi_delta)).trace())
-               
+
         return lik
-        
+
+    @para_trans
+    def logpost(self,Phi,Sigma,y=None):
+        return self.loglik(Phi,Sigma,y) + self._prior.logpdf(Phi,Sigma)
 
 class CompleteModel(BayesianVAR):
     """
@@ -319,7 +330,7 @@ class ForecastingExercise:
                 j += 1
 
         print "DONE."
-        
+
     def estimate(self, nsim=1000):
 
         self.__parasim = []
@@ -327,7 +338,7 @@ class ForecastingExercise:
             print "Estimating model %i. " % i
             self.__parasim.append(self.__model[i].estimate(nsim))
 
-    
+
     def generate_forecast(self, nthin=1):
         self.__yypred_dens = []
 
@@ -345,7 +356,7 @@ class ForecastingExercise:
             print "Evaluating model %i. " % i
             self.__pits[i, ...] = self.__yypred_dens[i].get_unconditional_pits()
             print self.__pits[i, ...]
-            
+
     def generate_pit_plot(self, hplot=[1, 4, 8]):
         plt.figure(1)
 
@@ -378,7 +389,7 @@ class ForecastingExercise:
     def get_crmse(self):
         self.__crmse = np.sqrt(np.mean(self.__cse, 0))
         return self.__crmse
-    
+
     def generate_rmse_plot(self):
         rmse = self.get_rmse()
 
@@ -388,7 +399,7 @@ class ForecastingExercise:
             plt.plot(np.arange(1, self.__hmax + 1), rmse[:, i])
 
         plt.show()
-            
+
     def get_model(self, i):
         """
         Returns the ith model.
@@ -397,7 +408,7 @@ class ForecastingExercise:
 
     def get_mcmc(self, i):
         return self.__parasim[i]
-    
+
 
 class ForecastingPredictiveCheck:
 
@@ -406,7 +417,7 @@ class ForecastingPredictiveCheck:
         self.estimated_model = estimated_model
         self.parasim = estimated_paras
 
-        
+
     def generate_trajectories(self, basedir, ntraj):
 
         parasim = self.parasim[0, ...]
@@ -423,7 +434,7 @@ class ForecastingPredictiveCheck:
             new_series = self.actuals
 
 
-            
+
 if __name__ == "__main__":
     # generate trajectories
     data_set = var_data.read_from_csv(filename="3eqvar.csv", header=True, freq="quarterly", start="1965q2")
@@ -451,7 +462,7 @@ if __name__ == "__main__":
     MN.generate_forecast()
     MN.evaluate_forecast()
     MN.generate_pit_plot()
-    MN.evaluate_se()      
+    MN.evaluate_se()
     rmse = MN.get_rmse()
     crmse = MN.get_crmse()
     print crmse[0, ...] / rmse

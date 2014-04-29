@@ -26,7 +26,7 @@ def para_trans(f):
             n = self.n
             p = self.p
             cons = self.cons
-            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n))
+            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
             Sigma = theta[n**2*p+n*(cons==True):]
             Sigma = np.choose(self.sigma_choose, Sigma)
         else:
@@ -34,7 +34,7 @@ def para_trans(f):
             Sigma = args[1]
         return f(self, Phi, Sigma, **kwargs)
     return reshaped_f
-    
+
 
 class MinnesotaPrior(DummyVarPrior):
     """A class for the Minnesota Prior."""
@@ -71,8 +71,9 @@ class MinnesotaPrior(DummyVarPrior):
         tau = hyperpara[5]
 
         if presample_moments is None:
-            ybar = np.mean(np.asarray(ypre), 0)
-            sbar = np.std(np.asarray(ypre), 0)
+            ybar = np.atleast_1d(np.mean(np.asarray(ypre), 0))
+            sbar = np.atleast_1d(np.std(np.asarray(ypre), 0))
+
         else:
             ybar = presample_moments[0]
             sbar = presample_moments[1]
@@ -88,7 +89,7 @@ class MinnesotaPrior(DummyVarPrior):
         x = range(int(max_n))
         z = np.zeros((ny, ny), dtype=int)
 
-        
+
         dist = n
         ind = 0
 
@@ -109,7 +110,7 @@ class MinnesotaPrior(DummyVarPrior):
         self.__dumy = np.mat(np.zeros((dumr, ny)))
         self.__dumx = np.mat(np.zeros((dumr, ny * p + cons)))
 
-            
+
         # tightness on prior of own lag coefficients
         self.__dumy[0:ny, 0:ny] = lam1 * tau * np.diag(sbar)
         self.__dumx[0:ny, 0:ny] = lam1 * np.diag(sbar)
@@ -154,7 +155,7 @@ class MinnesotaPrior(DummyVarPrior):
             x = np.zeros((ny*p+cons))
             x[-1] = lam1/lamxx
             self.__dumx = np.vstack((self.__dumx, x))
-            
+
     @property
     def Omega(self):
         return np.dot(self.__dumx.T, self.__dumx)
@@ -165,17 +166,17 @@ class MinnesotaPrior(DummyVarPrior):
 
     @property
     def Psi(self):
-        return (np.dot(self.__dumy.T, self.__dumy) 
+        return (np.dot(self.__dumy.T, self.__dumy)
                 - np.dot(self.Phi_star.T, np.dot(self.Omega, self.Phi_star)))
 
     @property
     def nu(self):
         return (self.__dumy.shape[0] - self.__dumx.shape[1])
-        
+
     def rvs(self, size=1, flatten_output=True):
         phis, sigmas = NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu).rvs(size)
         if flatten_output:
-            return np.array([np.r_[phis[i].flatten(), vech(sigmas[i])] for i in range(size)])
+            return np.array([np.r_[np.ravel(phis[i],order='F'), vech(sigmas[i])] for i in range(size)])
         else:
             return phis, sigmas
 
@@ -190,13 +191,13 @@ class MinnesotaPrior(DummyVarPrior):
 
     def theta(self, Phi, Sigma):
         return np.r_[Phi.flatten(), vech(Sigma)]
-        
+
     def inv_theta(theta):
-        pass 
+        pass
 
 
-            
-        
+
+
 
 class DiffusePrior(DummyVarPrior):
 
@@ -216,5 +217,3 @@ class TrainingSamplePrior(DummyVarPrior):
 
 class SSVSPrior(Prior):
     pass
-
-

@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
-from var_data import var_data, real_time_dataset
+#from var_data import var_data, real_time_dataset
 from math import sqrt, pi
 
 class PredictiveDensity:
@@ -91,10 +91,10 @@ class PredictiveDensity:
                 weight = weight / np.sum(weight)
                 for s in np.arange(0, self.__ny):
                     fcsts = self.__yypred[:, h, s]
-                    cmse[c, h, s] = pow(np.sum(fcsts * weight) - self.__yyact[h, s], 2) 
+                    cmse[c, h, s] = pow(np.sum(fcsts * weight) - self.__yyact[h, s], 2)
 
         return cmse
-                    
+
     def __get_kernel_weights():
         pass
 
@@ -130,11 +130,11 @@ class PredictiveDensity:
 #     N = N/np.sum(N)*100
 #     plt.bar(bins[:-1], N,  width=0.2)
 #     plt.ylim((0, 100))
-#  
-#  
-# plt.show()                              
+#
+#
+# plt.show()
 # dstart = "1965q1"
 # estart = "1996q1"
 # hmax = 8;
 # x = var_data.read_from_csv(filename="3eqvar.csv", header=True, freq="quarterly", start="1965q1")
-# rtdata = real_time_dataset(x, estart="1996q1", t0="1965q1") 
+# rtdata = real_time_dataset(x, estart="1996q1", t0="1965q1")
