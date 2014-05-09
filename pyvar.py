@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+import scipy as sp
 import numpy.matlib as M
 import sys
 
@@ -14,6 +15,22 @@ from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
 
+
+class MixtureVAR(object):
+
+    log_const = 1000
+    
+    def __init__(self, var_models, alphas=None):
+
+        self.nmix = var_models
+        if alphas==None:
+            alphas = np.ones((nmix))
+
+        alphas = np.asarray(alphas)
+        assert(alphas.size==self.nmix)
+
+        alphas = alphas/np.sum(alphas)
+        
 
 
 class VAR(object):
@@ -209,6 +226,8 @@ class BayesianVAR(VAR):
 
         _, logdetx    = np.linalg.slogdet(xest.T.dot(xest))
         _, logdetxdum = np.linalg.slogdet(xdum.T.dot(xdum))
+        #logdetx = np.log(sp.linalg.det(xest.T.dot(xest)))
+        #logdetxdum = np.log(sp.linalg.det(xdum.T.dot(xdum)))
 
         phihatT = np.linalg.solve(xest.T * xest, xest.T * yest)
         S = (yest - xest * phihatT).T.dot(yest - xest * phihatT)
@@ -247,20 +266,47 @@ class BayesianVAR(VAR):
 
         T,n = yest.shape
 
-        (phi_hat, s_hat) = self.mle(y)
-
-        s_hat = T*s_hat
+        ep = yest - xest.dot(Phi)
         Sigma_inv = np.linalg.inv(Sigma)
-        phi_delta = Phi - phi_hat
-
-        XtX = xest.T.dot(xest)
         lik = (-T*n/2*np.log(2*np.pi)
                -T/2*np.log(np.linalg.det(Sigma))
-               -0.5*(Sigma_inv.dot(s_hat)).trace()
-               -0.5*(Sigma_inv.dot(phi_delta.T).dot(XtX).dot(phi_delta)).trace())
-
+               -0.5*(Sigma_inv.dot(ep.T).dot(ep)).trace() )
         return lik
+        # (phi_hat, s_hat) = self.mle(yest)
 
+        # s_hat = T*s_hat
+        
+        # phi_delta = Phi - phi_hat
+
+        # XtX = xest.T.dot(xest)
+        # lik = (-T*n/2*np.log(2*np.pi)
+        #        -T/2*np.log(np.linalg.det(Sigma))
+        #        -0.5*(Sigma_inv.dot(s_hat)).trace()
+        #        -0.5*(Sigma_inv.dot(phi_delta.T).dot(XtX).dot(phi_delta)).trace())
+
+        # return lik
+
+    @para_trans
+    def lik(self, Phi, Sigma, y=None):
+        if y is None:
+            y = self.data
+
+        xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
+        if self._cons is True:
+            xest = add_constant(xest, prepend=False)
+
+
+        T,n = yest.shape
+
+        ep = yest - xest.dot(Phi)
+        Sigma_inv = np.linalg.inv(Sigma)
+
+
+        lik = ( (2*np.pi)**(-T*n/2)
+                * np.linalg.det(Sigma)**(-T/2)
+                *np.exp(-0.5*(Sigma_inv.dot(ep.T).dot(ep)).trace())
+                )
+        return lik
     @para_trans
     def logpost(self,Phi,Sigma,y=None):
         return self.loglik(Phi,Sigma,y) + self._prior.logpdf(Phi,Sigma)
