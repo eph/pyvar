@@ -1,39 +1,57 @@
 from __future__ import division
 import numpy as np
-import scipy as sp
-from scipy.linalg import solve, eig
-from statsmodels.tsa.tsatools import vec, vech
+
+from scipy.linalg import solve
+from statsmodels.tsa.tsatools import vech
 from distributions import NormInvWishart
+
+
+def para_trans_general(f):
+    """
+    This is a generic decorator to map a vector theta describing the
+    parameters of the VAR to the natural tuple describing it.
+    """
+    def reshaped_f(self, *args, **kwargs):
+        trpara = self.para_trans(*args, **kwargs)
+        return f(self, *trpara, **kwargs)
+    return reshaped_f
+
+
+def get_reduced_form(f):
+    """
+    This is similar to para_trans_general, but it only extracts the
+    matrices that matter for likelihood evaluation: (Phi, Sigma).
+
+    """
+    def reshaped_f(self, *args, **kwargs):
+        Phi, Sigma = self.reduced_form(*args, **kwargs)
+        return f(self, Phi, Sigma, **kwargs)
+    return reshaped_f
+
+
 class Prior(object):
+    """Container Class for prior objects."""
     def __init__(self):
         pass
 
-  
-
 class DummyVarPrior(Prior):
-
+    """"Dummy var prior."""
     def __init__(self):
         print "Initializing dummy prior."
 
     def get_pseudo_obs(self):
         return None
 
-def para_trans(f):
-    def reshaped_f(self, *args, **kwargs):
-        if len(args) == 1:
-            theta = args[0]
-            n = self.n
-            p = self.p
-            cons = self.cons
-            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
-            Sigma = theta[n**2*p+n*(cons==True):]
-            Sigma = np.choose(self.sigma_choose, Sigma)
-        else:
-            Phi = args[0]
-            Sigma = args[1]
-        return f(self, Phi, Sigma, **kwargs)
-    return reshaped_f
+class DiffusePrior(DummyVarPrior):
 
+    def __init__(self):
+        print "Initializing Diffuse Prior."
+
+    def get_pseudo_obs(self):
+        return None, None
+
+    def draw(self):
+        print "This is an improper prior."
 
 class MinnesotaPrior(DummyVarPrior):
     """A class for the Minnesota Prior."""
@@ -78,30 +96,6 @@ class MinnesotaPrior(DummyVarPrior):
             sbar = presample_moments[1]
 
         ny = ybar.size
-
-        self.n = ny;
-        self.p = p;
-        self.cons = cons;
-
-        n = ny
-        max_n = ny*(ny+1)/2
-        x = range(int(max_n))
-        z = np.zeros((ny, ny), dtype=int)
-
-        dist = n
-        ind = 0
-
-        for i in range(n):
-            # z[0:n-i, i:n] = x[ind:ind+dist]
-            # z[i:n, 0:n-i] = x[ind:ind+dist]
-            #z[range(0, n-i), range(i, n)] = x[ind:ind+dist]
-            #z[range(i, n), range(0, n-i)] = x[ind:ind+dist]
-            z[i, i:] = x[ind:ind+dist]
-            z[i:, i] = x[ind:ind+dist]
-            ind += dist
-            dist -= 1
-
-        self.sigma_choose = z
 
 
         dumr = ny * 2 + lam3*ny + ny * (p-1) + 1
@@ -156,10 +150,34 @@ class MinnesotaPrior(DummyVarPrior):
 
         self.__dumy = np.asarray(self.__dumy)
         self.__dumx = np.asarray(self.__dumx)
-        
+
         self.frozen_dist = NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu)
 
 
+        # for picking out sigma
+        self.n = ny;
+        self.p = p;
+        self.cons = cons;
+
+        n = ny
+        max_n = ny*(ny+1)/2
+        x = range(int(max_n))
+        z = np.zeros((ny, ny), dtype=int)
+
+        dist = n
+        ind = 0
+
+        for i in range(n):
+            # z[0:n-i, i:n] = x[ind:ind+dist]
+            # z[i:n, 0:n-i] = x[ind:ind+dist]
+            #z[range(0, n-i), range(i, n)] = x[ind:ind+dist]
+            #z[range(i, n), range(0, n-i)] = x[ind:ind+dist]
+            z[i, i:] = x[ind:ind+dist]
+            z[i:, i] = x[ind:ind+dist]
+            ind += dist
+            dist -= 1
+
+        self.sigma_choose = z
 
     @property
     def Omega(self):
@@ -185,32 +203,31 @@ class MinnesotaPrior(DummyVarPrior):
         else:
             return phis.squeeze(), sigmas.squeeze()
 
-    @para_trans
+    @para_trans_general
     def logpdf(self, Phi, Sigma):
         return self.frozen_dist.logpdf(Phi, Sigma)
-
-
 
     def get_pseudo_obs(self):
         return self.__dumy, self.__dumx
 
-
-
-class DiffusePrior(DummyVarPrior):
-
-    def __init__(self):
-        print "Initializing Diffuse Prior."
-
-    def get_pseudo_obs(self):
-        return None, None
-
-    def draw(self):
-        print "This is an improper prior."
-
+    def para_trans(self,*args,**kwargs):
+        if len(args) == 1:
+            theta = args[0]
+            n = self.n
+            p = self.p
+            cons = self.cons
+            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
+            Sigma = theta[n**2*p+n*(cons==True):]
+            Sigma = np.choose(self.sigma_choose, Sigma)
+        else:
+            Phi = args[0]
+            Sigma = args[1]
+        return Phi, Sigma
 
 class TrainingSamplePrior(DummyVarPrior):
     pass
 
 
-class SSVSPrior(Prior):
-    pass
+class HierarchicalMinnesotaPrior(MinnesotaPrior):
+    def __init__():
+        pass

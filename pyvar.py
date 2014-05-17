@@ -6,7 +6,7 @@ import sys
 
 #from var_data import var_data, real_time_dataset
 from mcmc import MCMC
-from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans
+from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general
 from statsmodels.tsa.tsatools import vec, vech
 from forecast_evaluation import PredictiveDensity
 import matplotlib.pyplot as plt
@@ -101,6 +101,7 @@ class BayesianVAR(VAR):
         self._prior = prior
         self.data = y
         self.sigma_choose = prior.sigma_choose
+        self.para_trans = prior.para_trans
         super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
 
         self.xest, self.yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
@@ -154,7 +155,7 @@ class BayesianVAR(VAR):
             xest = np.vstack((xdum, xest))
 
         return yest, xest
-        
+
     def pred_density(self, phi, sigma, ycurr, h=8):
         """Simulates predictive density..."""
 
@@ -186,7 +187,6 @@ class BayesianVAR(VAR):
         beta = np.linalg.solve(x.T.dot(x), x.T.dot(y))
         S = (y - x.dot(beta)).T.dot(y - x.dot(beta))/y.shape[0]
 
-
         return (beta, S)
 
 
@@ -213,19 +213,16 @@ class BayesianVAR(VAR):
         yest = np.vstack((ydum, yest))
         xest = np.vstack((xdum, xest))
 
-        _, logdetx    = np.linalg.slogdet(xest.T.dot(xest))
-        _, logdetxdum = np.linalg.slogdet(xdum.T.dot(xdum))
-        #logdetx = np.log(sp.linalg.det(xest.T.dot(xest)))
-        #logdetxdum = np.log(sp.linalg.det(xdum.T.dot(xdum)))
+        logdetx    = np.log(np.linalg.det(xest.T.dot(xest)))
+        logdetxdum = np.log(np.linalg.det(xdum.T.dot(xdum)))
 
         phihatT = np.linalg.solve(xest.T.dot(xest), xest.T.dot(yest))
         S = (yest - xest.dot(phihatT)).T.dot(yest - xest.dot(phihatT))
-        _, logdets    = np.linalg.slogdet(S)
+        logdets = np.log(np.linalg.det(S))
 
         phidumT = np.linalg.solve(xdum.T.dot(xdum), xdum.T.dot(ydum))
         Sdum = (ydum - xdum.dot(phidumT)).T.dot (ydum - xdum.dot(phidumT))
-        _, logdetsdum = np.linalg.slogdet(Sdum)
-
+        logdetsdum = np.log(np.linalg.det(Sdum))
         k = self._n * self._p + 1*(self._cons is True)
 
         kap = 0
@@ -243,7 +240,7 @@ class BayesianVAR(VAR):
                 )
         return lnpy
 
-    @para_trans
+    @para_trans_general
     def loglik(self, Phi, Sigma, y=None):
         if y is None:
             xest, yest = self.xest, self.yest
@@ -258,28 +255,15 @@ class BayesianVAR(VAR):
             np.linalg.cholesky(Sigma)
         except:
             return -10000000000000
-            
+
         ep = yest - xest.dot(Phi)
         Sigma_inv = np.linalg.inv(Sigma)
         lik = (-T*n/2*np.log(2*np.pi)
                -T/2*np.log(np.linalg.det(Sigma))
                -0.5*(Sigma_inv.dot(ep.T).dot(ep)).trace() )
         return lik
-        # (phi_hat, s_hat) = self.mle(yest)
 
-        # s_hat = T*s_hat
-        
-        # phi_delta = Phi - phi_hat
-
-        # XtX = xest.T.dot(xest)
-        # lik = (-T*n/2*np.log(2*np.pi)
-        #        -T/2*np.log(np.linalg.det(Sigma))
-        #        -0.5*(Sigma_inv.dot(s_hat)).trace()
-        #        -0.5*(Sigma_inv.dot(phi_delta.T).dot(XtX).dot(phi_delta)).trace())
-
-        # return lik
-
-    @para_trans
+    @para_trans_general
     def lik(self, Phi, Sigma, y=None):
         if y is None:
             xest, yest = self.xest, self.yest
@@ -301,9 +285,28 @@ class BayesianVAR(VAR):
                 )
         return lik
 
-    @para_trans
+    @para_trans_general
     def logpost(self,Phi,Sigma,y=None):
         return self.loglik(Phi,Sigma,y) + self._prior.logpdf(Phi,Sigma)
+
+    @para_trans_general
+    def forecast(self,Phi,Sigma,h=12,y=None,append=True):
+        if y is None:
+            y = self.data
+
+        y_base = y
+        y0 = np.ones((self._ny*self._p+self._cons))
+        y0[:-1*self._cons] = lagmat(y,self._p,'none')[-self._p]
+
+        yfcst = np.zeros((h, self._ny))
+
+        for i in range(h):
+            yfcst[i] = np.dot(y0, Phi)
+            y = np.vstack((y, yfcst[i]))
+            y0[:-1*self._cons] = lagmat(y,self._p,'none')[-self._p]
+
+        return yfcst
+
 
 class CompleteModel(BayesianVAR):
     """
@@ -511,35 +514,35 @@ class MixtureVAR(object):
 
     def log_mdd(self):
         return self.tot
-        
+
     def rvs(self, size=1, *args, **kwargs):
         modes = np.zeros((size), dtype=int)
         modes[np.random.rand(size)>self.alpha[0]] = 1#self.mix.rvs(size=size)
         return np.asarray([self.var_models[m].sample(nsim=1, *args, **kwargs).flatten() for m in modes])
 
-    @para_trans
+    @para_trans_general
     def logpost(self, Phi, Sigma):
         post = 0;
         for i in range(self.nmix):
             post += self.alpha[i]*np.exp(self.var_models[i].logpost(Phi, Sigma) + self.tot - self.mdds[i] - self.c)
         return self.c + np.log(post)
-        
-    @para_trans
+
+    @para_trans_general
     def loglik(self, Phi, Sigma):
         post = 0;
         for i in range(self.nmix):
             post += self.alpha[i]*np.exp(self.var_models[i].loglik(Phi, Sigma) + self.tot - self.mdds[i] - self.c)
         return self.c + np.log(post)
 
-    @para_trans
+    @para_trans_general
     def logliki(self, Phi, Sigma):
         x = map(lambda x: np.exp(x.logpost(Phi, Sigma) + self.tot - x.logmdd() - self.c), self.var_models)
         x = np.asarray(x).squeeze()
         x = self.c + np.log(self.alpha*x)
         x = np.exp(x - self.logpost(Phi, Sigma))
         return x
-    
-    @para_trans
+
+    @para_trans_general
     def logprior(self, Phi, Sigma):
         return self.prior.logdens(Phi, Sigma)
 
@@ -559,7 +562,7 @@ class MixtureVAR(object):
 
     #         # BETA
     #         yest, xest = self.var_model[m].get_xy()
-            
+
     #         phihatT = np.linalg.solve(xest.T.dot(xest), xest.T.dot(yest))
     #         S = (yest - xest * phihatT).T.dot(yest - xest * phihatT)
     #         nu = yest.shape[0] - self._p * self._ny - self._cons*1
@@ -568,12 +571,12 @@ class MixtureVAR(object):
 
     #         omega_inv = np.linalg.inv(omega)
     #         mvn_covar = np.kron(SIGMA, self.inv_omega)
-        
+
     #         BETA = np.random.multivariate_normal(np.ravel(muphi, order='F'), mvn_covar)
 
     #         lnpy1 = self.var_models[m].logpost(BETA, SIGMA)
-            
-            
+
+
 if __name__ == "__main__":
     # generate trajectories
     data_set = var_data.read_from_csv(filename="3eqvar.csv", header=True, freq="quarterly", start="1965q2")
@@ -608,6 +611,3 @@ if __name__ == "__main__":
     print crmse[1, ...] / rmse
     print crmse[2, ...] / rmse
     print rmse
-    # now generate the predictive checks
-    # try:
-    #    os.mkdir(mname)
