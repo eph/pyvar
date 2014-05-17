@@ -8,8 +8,7 @@ class Prior(object):
     def __init__(self):
         pass
 
-    def to_phi_sigma(f):
-        pass
+  
 
 class DummyVarPrior(Prior):
 
@@ -70,7 +69,7 @@ class MinnesotaPrior(DummyVarPrior):
         lam5 = hyperpara[4]
         tau = hyperpara[5]
 
-        if presample_moments is None:
+        if presample_moments==None:
             ybar = np.atleast_1d(np.mean(np.asarray(ypre), 0))
             sbar = np.atleast_1d(np.std(np.asarray(ypre), 0))
 
@@ -88,7 +87,6 @@ class MinnesotaPrior(DummyVarPrior):
         max_n = ny*(ny+1)/2
         x = range(int(max_n))
         z = np.zeros((ny, ny), dtype=int)
-
 
         dist = n
         ind = 0
@@ -156,6 +154,13 @@ class MinnesotaPrior(DummyVarPrior):
             x[-1] = lam1/lamxx
             self.__dumx = np.vstack((self.__dumx, x))
 
+        self.__dumy = np.asarray(self.__dumy)
+        self.__dumx = np.asarray(self.__dumx)
+        
+        self.frozen_dist = NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu)
+
+
+
     @property
     def Omega(self):
         return np.dot(self.__dumx.T, self.__dumx)
@@ -178,24 +183,16 @@ class MinnesotaPrior(DummyVarPrior):
         if flatten_output:
             return np.array([np.r_[np.ravel(phis[i],order='F'), vech(sigmas[i])] for i in range(size)])
         else:
-            return phis, sigmas
+            return phis.squeeze(), sigmas.squeeze()
 
     @para_trans
     def logpdf(self, Phi, Sigma):
-        return NormInvWishart(self.Phi_star, self.Omega, self.Psi, self.nu).logpdf(Phi, Sigma)
+        return self.frozen_dist.logpdf(Phi, Sigma)
 
 
 
     def get_pseudo_obs(self):
         return self.__dumy, self.__dumx
-
-    def theta(self, Phi, Sigma):
-        return np.r_[Phi.flatten(), vech(Sigma)]
-
-    def inv_theta(theta):
-        pass
-
-
 
 
 

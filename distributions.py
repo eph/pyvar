@@ -23,8 +23,15 @@ class InvWishart(object):
         self.nu = nu
         self.inv_psi = np.linalg.inv(psi)
         self.chol_inv_psi = np.linalg.cholesky(self.inv_psi)
-        _, self.logdetpsi = np.linalg.slogdet(self.psi)
 
+        # constants
+        self.logdetpsi = np.log(np.linalg.det(self.psi))
+        self.gamma_const = multigammaln(self.nu/2,self.p)
+
+        self.lik_const = ( -(self.nu*self.p)/2.0 * np.log(2)
+                           - self.gamma_const
+                           + self.nu/2. * self.logdetpsi )
+        
     def rvs(self, ndraw=1):
         """This all could be optimized."""
         return np.array([self.draw() for _ in range(ndraw)])
@@ -39,10 +46,10 @@ class InvWishart(object):
         return IW
 
     def logpdf(self, x):
-        _, logdetx = np.linalg.slogdet(x)
+        
+        logdetx = np.log(np.linalg.det(x))
 
-        lpdf = -(self.nu*self.p)/2.0 * np.log(2) - multigammaln(self.nu/2,self.p) \
-               + self.nu/2. * self.logdetpsi - (self.nu + self.p + 1)/2.0*logdetx \
+        lpdf = self.lik_const - (self.nu + self.p + 1)/2.0*logdetx \
                - 0.5*np.trace(np.dot(self.psi, np.linalg.inv(x)))
 
         return lpdf
@@ -59,7 +66,8 @@ class NormInvWishart(object):
         self.mu = mu
         self.omega = omega
         self.inv_omega = np.linalg.inv(omega)
-
+        self.logdet_inv_omega = np.log(np.linalg.det(self.inv_omega))
+        
         self.r, self.c = mu.shape
         self.mu = np.ravel(self.mu,order='F')
 
@@ -86,9 +94,34 @@ class NormInvWishart(object):
 
     def logpdf(self, BETA, SIGMA):
         BETA = np.ravel(BETA, order='F')
+
+        SIGMA_I = np.linalg.inv(SIGMA)
+        #mvn_covar = np.kron(SIGMA, self.inv_omega)
+
+        SIG_I = np.kron(SIGMA_I, self.omega) #np.linalg.inv(mvn_covar)
+        
+        #_, logdet = np.linalg.slogdet(mvn_covar)
+        logdet = (self.omega.shape[0]*np.log(np.linalg.det(SIGMA))
+                  + SIGMA.shape[0]*self.logdet_inv_omega)
+
+        z = BETA-self.mu
+        lpdf = -self.n/2.0*np.log(2*np.pi) - 0.5*logdet \
+               -0.5*(z).T.dot(SIG_I).dot(z)
+        return (self.iw.logpdf(SIGMA) + lpdf)
+
+    def logpdf_old(self, BETA, SIGMA):
+        BETA = np.ravel(BETA, order='F')
+
+        SIGMA_I = np.linalg.inv(SIGMA)
         mvn_covar = np.kron(SIGMA, self.inv_omega)
-        _, logdet = np.linalg.slogdet(mvn_covar)
+
         SIG_I = np.linalg.inv(mvn_covar)
+        
+        _, logdet = np.linalg.slogdet(mvn_covar)
+        #logdet = (self.omega.shape[0]*np.log(np.det(SIGMA))
+        #          + SIGMA.shape[0]*self.logdet_inv_omega)
+
+        
         lpdf = -self.n/2.0*np.log(2*np.pi) - 0.5*logdet \
                -0.5*(BETA-self.mu).T.dot(SIG_I).dot(BETA-self.mu)
         return (self.iw.logpdf(SIGMA) + lpdf)
