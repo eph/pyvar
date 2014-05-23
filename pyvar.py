@@ -101,12 +101,28 @@ class BayesianVAR(VAR):
         self._prior = prior
         self.data = y
         self.sigma_choose = prior.sigma_choose
-        self.para_trans = prior.para_trans
+        #self.para_trans = prior.para_trans
         super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
 
         self.xest, self.yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
         if self._cons == True:
             self.xest = add_constant(self.xest, prepend=False)
+            
+    # Temporary fix -- need to inherit from prior 
+    def para_trans(self,*args,**kwargs):
+        if len(args) == 1:
+            theta = args[0]
+            n = self.n
+            p = self.p
+            cons = self.cons
+            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
+            Sigma = theta[n**2*p+n*(cons==True):]
+            Sigma = np.choose(self.sigma_choose, Sigma)
+        else:
+            Phi = args[0]
+            Sigma = args[1]
+        return Phi, Sigma
+
     def sample(self, nsim=1000, y=None,flatten_output=False):
 
         if y is None:
@@ -128,7 +144,7 @@ class BayesianVAR(VAR):
         S = (yest - xest.dot(phihatT)).T.dot(yest - xest.dot(phihatT))
         nu = yest.shape[0] - self._p * self._ny - self._cons*1
         omega = xest.T.dot(xest)
-        muphi = phihatT#.flatten()#np.ravel(phihatT)
+        muphi = phihatT
 
         phis, sigmas = NormInvWishart(phihatT, omega, S, nu).rvs(nsim)
 
@@ -499,7 +515,7 @@ class MixtureVAR(object):
 
         assert len(self.var_models)==alpha.size
         self.alpha = alpha
-        #self.mix = rv_discrete(values=[range(self.nmix), self.alpha])
+
 
         self.prior = prior
 
@@ -511,6 +527,25 @@ class MixtureVAR(object):
         self.p = self.var_models[0].p
         self.cons = self.var_models[0].cons
         self.sigma_choose = self.var_models[0].sigma_choose
+
+
+    # Temporary fix -- need to inherit from prior 
+    def para_trans(self,*args,**kwargs):
+        if len(args) == 1:
+            theta = args[0]
+            n = self.n
+            p = self.p
+            cons = self.cons
+            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
+            Sigma = theta[n**2*p+n*(cons==True):]
+            Sigma = np.choose(self.sigma_choose, Sigma)
+        else:
+            Phi = args[0]
+            Sigma = args[1]
+        return Phi, Sigma
+
+
+
 
     def log_mdd(self):
         return self.tot
@@ -545,6 +580,7 @@ class MixtureVAR(object):
     @para_trans_general
     def logprior(self, Phi, Sigma):
         return self.prior.logdens(Phi, Sigma)
+
 
     # @para_trans
     # def rwmh(self, proposal, nsim=1000, flatten_output=True):
