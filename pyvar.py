@@ -6,7 +6,7 @@ import sys
 
 #from var_data import var_data, real_time_dataset
 from mcmc import MCMC
-from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general
+from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
 from statsmodels.tsa.tsatools import vec, vech
 from forecast_evaluation import PredictiveDensity
 import matplotlib.pyplot as plt
@@ -15,6 +15,11 @@ from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
 
+class MSVARPrior(object):
+
+    def __init__(self, ):
+
+        
 class VAR(object):
     """
     A class for Vector Autoregressions of the form.
@@ -100,8 +105,9 @@ class BayesianVAR(VAR):
         """Initialization."""
         self._prior = prior
         self.data = y
-        self.sigma_choose = prior.sigma_choose
-        #self.para_trans = prior.para_trans
+        #self.sigma_choose = prior.sigma_choose
+        self.para_trans = prior.para_trans
+        self.reduced_form = prior.reduced_form
         super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
 
         self.xest, self.yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
@@ -109,19 +115,19 @@ class BayesianVAR(VAR):
             self.xest = add_constant(self.xest, prepend=False)
             
     # Temporary fix -- need to inherit from prior 
-    def para_trans(self,*args,**kwargs):
-        if len(args) == 1:
-            theta = args[0]
-            n = self.n
-            p = self.p
-            cons = self.cons
-            Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
-            Sigma = theta[n**2*p+n*(cons==True):]
-            Sigma = np.choose(self.sigma_choose, Sigma)
-        else:
-            Phi = args[0]
-            Sigma = args[1]
-        return Phi, Sigma
+    # def para_trans(self,*args,**kwargs):
+    #     if len(args) == 1:
+    #         theta = args[0]
+    #         n = self.n
+    #         p = self.p
+    #         cons = self.cons
+    #         Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
+    #         Sigma = theta[n**2*p+n*(cons==True):]
+    #         Sigma = np.choose(self.sigma_choose, Sigma)
+    #     else:
+    #         Phi = args[0]
+    #         Sigma = args[1]
+    #     return Phi, Sigma
 
     def sample(self, nsim=1000, y=None,flatten_output=False):
 
@@ -172,23 +178,44 @@ class BayesianVAR(VAR):
 
         return yest, xest
 
-    def pred_density(self, phi, sigma, ycurr, h=8):
+    @para_trans_general
+    @to_reduced_form
+    def reduced_form_irf(self, phi, sigma, h=8): 
+        pass
+        
+    @para_trans_general
+    @to_reduced_form
+    def pred_density(self, phi, sigma, y=None, h=8, impact_mat=None):
         """Simulates predictive density..."""
 
-        x = ycurr.mlag(self._p, self._cons)[-1, :]
-        nx = x.shape[1]
+        if y is None:
+            #xest, yest = self.xest, self.yest
+            xest = lagmat(self.data, maxlag=self._p, trim='backward')
+            xest = add_constant(xest, prepend=False)
+            xest = xest[-self._p]
+        else:
+            xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
+            if self._cons is True:
+                xest = add_constant(xest, prepend=False)
+
+        x = xest
+
+        nx = x.shape[0]
         y = np.zeros((h, self._ny))
+
+        if impact_mat==None:
+            impact_mat = np.ones_like(y)
+
+        impact_mat = np.squeeze(impact_mat)
+
         for i in range(0, h):
-            y[i, :] = x * phi + randn(np.zeros(self._ny), sigma)
+            y[i, :] = x.dot(phi) + impact_mat[i] * np.random.multivariate_normal(np.zeros(self._ny), sigma)
             if self._p > 0:
-                x[:, :(self._ny * (self._p - 1))] = x[:, (self._ny):(nx-self._cons)]
-                x[:, (self._ny * (self._p - 1)):-1] = y[i, :]
+                x[ :(self._ny * (self._p - 1))] = x[(self._ny):(nx-self._cons)]
+                x[ (self._ny * (self._p - 1)):-1] = y[i, :]
             else:
                 x = y[i, :]
         return y
-
-    def to_phi_sigma(self):
-        return self._prior.to_phi_sigma
 
     def mle(self, y=None):
         """MLE."""
@@ -257,6 +284,7 @@ class BayesianVAR(VAR):
         return lnpy
 
     @para_trans_general
+    @to_reduced_form
     def loglik(self, Phi, Sigma, y=None):
         if y is None:
             xest, yest = self.xest, self.yest
@@ -266,7 +294,6 @@ class BayesianVAR(VAR):
                 xest = add_constant(xest, prepend=False)
 
         T,n = yest.shape
-
         try:
             np.linalg.cholesky(Sigma)
         except:
@@ -280,6 +307,7 @@ class BayesianVAR(VAR):
         return lik
 
     @para_trans_general
+    @to_reduced_form
     def lik(self, Phi, Sigma, y=None):
         if y is None:
             xest, yest = self.xest, self.yest
@@ -305,7 +333,9 @@ class BayesianVAR(VAR):
     def logpost(self,Phi,Sigma,y=None):
         return self.loglik(Phi,Sigma,y) + self._prior.logpdf(Phi,Sigma)
 
+
     @para_trans_general
+    @to_reduced_form
     def forecast(self,Phi,Sigma,h=12,y=None,append=True):
         if y is None:
             y = self.data
