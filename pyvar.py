@@ -15,11 +15,27 @@ from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
 
-class MSVARPrior(object):
+# class MSVAR(object):
 
-    def __init__(self, ):
+#     def __init__(self, ny=3, p=5, cons=True, ns_mu=1, ns_var=2):
 
+#         self.short_names = []
+#         self.tex_names = []
+
+#         Astr = "A[s={:d}][{:d},{:d}]"
+#         Atex = r"A\left(s_{\mu}={:d})_{{0, {:d}{:d}}}\right)"
+#         self.cols = [[] for _ in range(ny)]
         
+#         for s in range(ns_mu):
+#             for j in range(ny):
+#                 lena = j+1
+#                 for i in range(lena):
+#                     self.short_names.append(Astr.format(s, i, j))
+#                     self.cols[]
+#                     self.tex_names.append(Atex.format(s, i, j))
+
+#         Fstr = r"Fs_{\mu})[{:d},{:d}]"
+
 class VAR(object):
     """
     A class for Vector Autoregressions of the form.
@@ -108,8 +124,8 @@ class BayesianVAR(VAR):
         #self.sigma_choose = prior.sigma_choose
         self.para_trans = prior.para_trans
         self.reduced_form = prior.reduced_form
-        super(BayesianVAR, self).__init__(prior.n, prior.p, prior.cons)
-
+        super(BayesianVAR, self).__init__(prior.ny, prior.p, prior.cons)
+        
         self.xest, self.yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
         if self._cons == True:
             self.xest = add_constant(self.xest, prepend=False)
@@ -178,13 +194,11 @@ class BayesianVAR(VAR):
 
         return yest, xest
 
-    @para_trans_general
-    @to_reduced_form
+    @para_trans_general     #@to_reduced_form
     def reduced_form_irf(self, phi, sigma, h=8): 
         pass
         
-    @para_trans_general
-    @to_reduced_form
+    @para_trans_general     #@to_reduced_form
     def pred_density(self, phi, sigma, y=None, h=8, impact_mat=None):
         """Simulates predictive density..."""
 
@@ -283,7 +297,6 @@ class BayesianVAR(VAR):
                 )
         return lnpy
 
-    @para_trans_general
     @to_reduced_form
     def loglik(self, Phi, Sigma, y=None):
         if y is None:
@@ -294,6 +307,7 @@ class BayesianVAR(VAR):
                 xest = add_constant(xest, prepend=False)
 
         T,n = yest.shape
+
         try:
             np.linalg.cholesky(Sigma)
         except:
@@ -306,7 +320,6 @@ class BayesianVAR(VAR):
                -0.5*(Sigma_inv.dot(ep.T).dot(ep)).trace() )
         return lik
 
-    @para_trans_general
     @to_reduced_form
     def lik(self, Phi, Sigma, y=None):
         if y is None:
@@ -334,7 +347,6 @@ class BayesianVAR(VAR):
         return self.loglik(Phi,Sigma,y) + self._prior.logpdf(Phi,Sigma)
 
 
-    @para_trans_general
     @to_reduced_form
     def forecast(self,Phi,Sigma,h=12,y=None,append=True):
         if y is None:
@@ -342,18 +354,142 @@ class BayesianVAR(VAR):
 
         y_base = y
         y0 = np.ones((self._ny*self._p+self._cons))
-        y0[:-1*self._cons] = lagmat(y,self._p,'none')[-self._p]
+        y0[:self._ny*self._p] = lagmat(y_base,self._p,'none')[-self._p]
 
         yfcst = np.zeros((h, self._ny))
 
         for i in range(h):
             yfcst[i] = np.dot(y0, Phi)
             y = np.vstack((y, yfcst[i]))
-            y0[:-1*self._cons] = lagmat(y,self._p,'none')[-self._p]
-
+            if self._cons:
+                y0[:-self._cons] = lagmat(y,self._p,'none')[-self._p]
+            else:
+                y0 = lagmat(y,self._p,'none')[-self._p]
         return yfcst
 
+    @para_trans_general
+    def to_state_space(self, Phi, Sigma):
 
+        print "only works for p=1]"
+
+        from scipy.linalg import block_diag
+        n = self._n
+        TT = block_diag(*[Phi[i*n:(i+1)*n, i*n:(i+1)*n].T for i in range(self._p)])
+        
+        RR = np.zeros(((self._p)*n, n))
+        RR[:n, :] = np.eye(n)
+        QQ = Sigma
+
+        if self._cons:
+            DD = np.linalg.inv(np.eye(n) - TT).dot(Phi[-1, :]).squeeze()
+        else:
+            DD = np.zeros((self._n))
+        ZZ = np.zeros((self._p*n, n)).T
+        ZZ[:, :n] = np.eye(n)
+
+        HH = np.zeros((n, n))
+
+        def funcify(x):
+            def lam(para):
+                return x
+            return lam
+
+        TT =funcify(TT)
+        RR =funcify(RR)
+        QQ =funcify(QQ)
+
+        DD =funcify(DD)
+        ZZ =funcify(ZZ)
+        HH =funcify(HH)
+
+        
+        from dsge.StateSpaceModel import StateSpaceModel
+
+        return StateSpaceModel(self.data, TT, RR, QQ, DD, ZZ, HH, t0=self._p)
+
+
+        
+class ConstrainedVAR(BayesianVAR):
+
+    def __init__(self, prior, y, constraint):
+
+        super(BayesianVAR, self).__init__(prior, y)
+        self.contstraint = constraint
+
+    @para_trans_general
+    def loglik(self, Phi, Sigma):
+        pass
+        
+        
+    
+class BayesianSteadyStateVAR(VAR):
+
+    def __init__(self, prior, y):
+
+        # b/c of pickling problems
+        self.ntrends = prior.ntrends
+        self.cyclical_prior = prior.cyclical_prior
+
+        self.data = y
+        self.prior = prior
+        D = np.atleast_2d(np.tile(np.arange(y.shape[0]), self.prior.ntrends)).T
+
+        for t in range(self.prior.ntrends):
+            D[:, t] = D[:, t]**t
+
+        self.D = D
+        self.cyclical_var = BayesianVAR(prior.cyclical_prior, y)
+
+        super(BayesianSteadyStateVAR, self).__init__(prior.n, prior.p, prior.cons)
+        
+        #self.para_trans = prior.para_trans
+        #self.reduced_form = prior.reduced_form
+
+    def para_trans(self, *args, **kwargs):
+        if len(args)==1:
+            theta = args[0]
+            Gamma = np.reshape(theta[-self.ntrends*self.n:], (self.ntrends, self.n),order='F')
+            Phi, Sigma = self.cyclical_prior.para_trans(theta[:-self.ntrends*self.n])
+        else:
+            Phi = args[0]
+            Sigma = args[1]
+            Gamma = args[2]
+
+        return Phi, Sigma, Gamma
+
+
+    @para_trans_general
+    def forecast(self, Phi, Sigma, Gamma, h=12, y=None, D=None):
+        if y is None:
+            y = self.data
+            D = self.D
+        elif D is None:
+            D = np.atleast_2d(np.tile(np.arange(y.shape[0]), self.prior.ntrends)).T
+
+            for t in range(self.prior.ntrends):
+                D[:, t] = D[:, t]**t
+
+            
+        yhat = y - D.dot(Gamma)
+        yfcst = self.cyclical_var.forecast(Phi, Sigma, h=h, y=yhat)
+
+        D = np.atleast_2d(np.tile(np.arange(y.shape[0], y.shape[0]+h), self.prior.ntrends)).T
+
+        for t in range(self.prior.ntrends):
+            D[:, t] = D[:, t]**t
+
+        
+        yfcst = yfcst + D.dot(Gamma)
+        return yfcst
+    @para_trans_general
+    def loglik(self, Phi, Sigma, Gamma, y=None):
+
+        if y is None:
+            y = self.data
+
+        yhat = y - self.D.dot(Gamma)
+        return self.cyclical_var.loglik(Phi, Sigma, y=yhat)
+        
 class CompleteModel(BayesianVAR):
     """
     This is a class for Complete Models, i.e., a model and data.
@@ -556,7 +692,7 @@ class MixtureVAR(object):
         self.n = self.var_models[0].n
         self.p = self.var_models[0].p
         self.cons = self.var_models[0].cons
-        self.sigma_choose = self.var_models[0].sigma_choose
+        self.sigma_choose = self.var_models[0]._prior.sigma_choose
 
 
     # Temporary fix -- need to inherit from prior 
