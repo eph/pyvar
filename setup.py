@@ -2,11 +2,10 @@ import setuptools
 
 
 if __name__ == "__main__":
-
     numpy.distutils.core.setup(
         name='pyvar',
         version='0.0.1',
         platforms='linux',
-        packages=['pyvar'],
+        packages=['var'],
         test_suite='nose.collector',
         tests_require=['nose'])
