@@ -6,6 +6,6 @@ if __name__ == "__main__":
         name='pyvar',
         version='0.0.1',
         platforms='linux',
-        packages=['var'], 
+        packages=['pyvar'], 
         test_suite='nose.collector',
         tests_require=['nose'])
