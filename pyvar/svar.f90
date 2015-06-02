@@ -33,8 +33,8 @@ module {name}
   logical :: data_loaded
   real(wp) :: YY(T,ny), XX(T,ny*p+constant)
 
-  real(wp), parameter :: pmeanrho = 0.75, pstddrho = 0.10
-
+  real(wp), parameter :: pmeanrho = 0.75d0, pstddrho = 0.10d0
+  real(wp), parameter :: pmeanbeta = 0.0d0, pstddbeta = 0.10d0
 
 contains
 
@@ -78,7 +78,7 @@ contains
     ! hack for external instruments model
     !------------------------------------------------------------
     if (npara>(nA+nF)) then
-       logprior = logprior + lognorpdf(para(nA+nF+1),0.0d0,3.0d0)
+       logprior = logprior + lognorpdf(para(nA+nF+1),0.0d0,pstddbeta)
 
        if ( (para(nA+nF+2)<0.0d0) .or. (para(nA+nF+2)>1.0d0) ) then
           logprior = -1000000000.0d0
@@ -129,7 +129,7 @@ contains
     if (npara > (nA+nF)) then
        status = vdrnggaussian(VSL_RNG_METHOD_GAUSSIAN_BOXMULLER, stream, & 
             npart*(nA+nF), dev,0.0_wp,1.0_wp)
-       priodraws(:,nA+nF+1) = 3*dev(:,1)
+       priodraws(:,nA+nF+1) = pstddbeta*dev(:,1)
        status = vdrnguniform(VSL_METHOD_DUNIFORM_STD, stream, npart, priodraws(:,nA+nF+2), 0.0d0, 1.0d0)
     end if
 
