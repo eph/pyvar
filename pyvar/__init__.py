@@ -1,1 +1,2 @@
-from varprior import SimsZhaSVARPrior
+from pyvar import *
+from varprior import *
