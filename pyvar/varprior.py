@@ -443,7 +443,7 @@ class SimsZhaSVARPrior(Prior):
 
         output['assign_para'] = '\n'.join(A0str + Apstr)
 
-        with open('/mq/home/m1eph00/python-repo/var/svar.f90', 'r') as f:
+        with open('/mq/home/m1eph00/python-repo/var/pyvar/svar.f90', 'r') as f:
             svar = f.read()
 
         with open(output_dir + name + '.f90', 'w') as f:
@@ -452,6 +452,107 @@ class SimsZhaSVARPrior(Prior):
 
 
 from scipy.stats import norm, gamma
+class TwoExternalInstrumentsSVARPrior(SimsZhaSVARPrior):
+
+    def __init__(self, *args, **kwargs):
+
+        self.gamma = kwargs.pop('gamma', None)
+        self.rho = kwargs.pop('rho', None)
+
+        self.gamma21 = kwargs.pop('gamma21', None)
+        self.gamma22 = kwargs.pop('gamma22', None)
+        self.rho2 = kwargs.pop('rho2')
+        
+        super(TwoExternalInstrumentsSVARPrior, self).__init__(*args, **kwargs)
+
+        self.ny = self.ny+2
+        
+    def rvs(self, size=1, flatten=True):
+        x = super(TwoExternalInstrumentsSVARPrior, self).rvs(size=size, flatten=flatten)
+        gamma = self.gamma.rvs(size=size)
+        rho = self.rho.rvs(size=size)
+
+        gamma21 = self.gamma21.rvs(size=size)
+        gamma22 = self.gamma22.rvs(size=size)
+        rho2 = self.rho2.rvs(size=size)
+
+        x0 = np.c_[x, gamma, rho, gamma21, gamma22, rho2]
+        
+        if flatten == True:
+            return x0 
+
+    def para_trans(self, *args, **kwargs):
+        dtype=kwargs.pop('dtype', float)
+        sqrt = np.sqrt
+        if dtype==object:
+            import sympy
+            sqrt = sympy.sqrt
+        if len(args) == 1:
+            A0, Aplus = super(TwoExternalInstrumentsSVARPrior, self).para_trans(args[0][:-5], dtype=dtype) 
+
+            gam = args[0][-5]
+            rho = args[0][-4]
+            gam21 = args[0][-3]
+            gam22 = args[0][-2]
+            rho2 = args[0][-1]
+
+
+            A0t = np.zeros((self.ny, self.ny), dtype=dtype)
+            A0t[:-2, :][:, :-2] = A0
+            A0t[-1, -1] = 1
+            A0t[-2, -2] = 1
+            if dtype==float:
+                I = np.eye(self.ny)
+            else:
+                I = sympy.Matrix(self.ny, self.ny, np.zeros((self.ny**2)))
+                for j in range(self.ny):
+                    I[j, j] = 1
+                
+            I[-1, -1] = gam*sqrt( (1 - rho)/rho)
+            I[0, -1] = gam
+            I[0, -2] = gam21
+            I[1, -2] = gam22
+            I[-2, -2] = sqrt(gam21**2 + gam22**2)*sqrt( (1-rho2)/rho2)
+            
+            if dtype==object:
+                A0t = sympy.Matrix(A0t) * sympy.Matrix(I).inv()
+            else:
+                A0t = A0t.dot(np.linalg.inv(I))
+            
+
+            Aplust = np.zeros((self.ny*self.p + self.cons, self.ny), dtype=dtype)
+            for i in range(self.p):
+                ind0 = i*self.n 
+                ind0t = i*self.ny
+                Aplust[ind0t:ind0t+self.n, :][:, :-2] = Aplus[ind0:ind0+self.n, :]
+
+            if self.cons == True:
+                Aplust[-1, :-2] = Aplus[-1, :]
+
+            if dtype==object:
+                Aplust = sympy.Matrix(Aplust) * sympy.Matrix(I).inv()
+            else:
+                Aplust = Aplust.dot(np.linalg.inv(I))
+
+            return A0t, Aplust
+
+        elif len(args) == 2:
+            return args[0], args[1]
+    
+            
+
+    def logpdf(self, x):
+        A0, Aplus = super(TwoExternalInstrumentsSVARPrior, self).para_trans(x[:-5]) 
+        sz = super(TwoExternalInstrumentsSVARPrior, self).logpdf(A0, Aplus)
+
+        if self.parameterization == 'rho':
+            pdfx = self.rho.logpdf(x[-1])
+        else:
+            pdfx = self.signu.logpdf(x[-1])
+            
+        return sz + self.gamma.logpdf(x[-2]) + pdfx
+
+
 class ExternalInstrumentsSVARPrior(SimsZhaSVARPrior):
 
     def __init__(self, *args, **kwargs):
@@ -516,6 +617,8 @@ class ExternalInstrumentsSVARPrior(SimsZhaSVARPrior):
         elif len(args) == 2:
             return args[0], args[1]
     
+            
+
     def logpdf(self, x):
         A0, Aplus = super(ExternalInstrumentsSVARPrior, self).para_trans(x[:-2]) 
         sz = super(ExternalInstrumentsSVARPrior, self).logpdf(A0, Aplus)
@@ -792,6 +895,16 @@ class MinnesotaPrior(DummyVarPrior):
                 self.__dumy[subt + i, i] = sbar[i]
             subt += ny
 
+
+        # co-persistence dummy observations
+        self.__dumy[subt, :] = np.mat(lam5 * ybar)
+        for i in np.arange(0, p):
+            self.__dumx[subt, i * ny:(i + 1) * ny] = lam5 * ybar
+
+        if cons:
+            self.__dumx[subt, -1] = lam5
+        subt += 1
+
         # sum of coefficients dummies
         for i in np.arange(0, ny):
             disp = subt + i
@@ -801,14 +914,6 @@ class MinnesotaPrior(DummyVarPrior):
                 self.__dumx[disp, xcord] = lam4 * ybar[i]
 
         subt += ny
-
-        # co-persistence dummy observations
-        self.__dumy[subt, :] = np.mat(lam5 * ybar)
-        for i in np.arange(0, p):
-            self.__dumx[subt, i * ny:(i + 1) * ny] = lam5 * ybar
-
-        if cons:
-            self.__dumx[subt, -1] = lam5
 
         # Add Mark's thing (NOT IN DNS)
         if lamxx is not None:
@@ -889,7 +994,6 @@ class MinnesotaPrior(DummyVarPrior):
             Phi = args[0]
             Sigma = args[1]
         return Phi, Sigma
-
 
 
 class SteadyStateVARPrior(Prior):
