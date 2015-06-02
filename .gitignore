@@ -3,3 +3,7 @@
 MN/*
 
 .ropeproject/*
+
+build/*
+dist/*
+pyvar.egg-info/*
