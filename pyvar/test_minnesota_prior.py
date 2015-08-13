@@ -51,3 +51,36 @@ class TestMinnesota(TestCase):
         yydum_minn, xxdum_minn = minnpr.get_pseudo_obs()
         assert_almost_equal(yydum_minn, YYdum)
         assert_almost_equal(xxdum_minn, XXdum)
+
+
+        YYdum = np.array([[0.024863787734143,                   0,                   0], 
+                          [                  0,  0.025530860432406,                    0],
+                          [                  0,                  0,    0.033133670737398],  
+                          [  0.024863787734143,                  0,                    0], 
+                          [                  0,  0.025530860432406,                    0],  
+                          [                  0,                  0,    0.033133670737398],  
+                          [ -0.019071194893617,  0.149108708510638,    0.242331914893617],  
+                          [ -0.004767798723404,                  0,                    0],  
+                          [                  0,  0.037277177127660,                    0],  
+                          [                  0,                  0,    0.060582978723404]])
+
+        XXdum = np.array([[ 0.024863787734143 ,                   0  ,                 0   ,                  0] , 
+                          [                 0 ,    0.025530860432406 ,                 0   ,                  0] , 
+                          [                 0 ,                  0   , 0.033133670737398   ,                  0] , 
+                          [                 0 ,                  0   ,                 0   ,                  0] , 
+                          [                 0 ,                 0    ,                0    ,                  0] , 
+                          [                 0 ,                 0    ,                0    ,                  0] , 
+                          [-0.019071194893617 , 0.149108708510638    , .242331914893617    ,  4.000000000000000] , 
+                          [-0.004767798723404 ,                 0    ,                0    ,                  0] , 
+                          [                 0 , 0.037277177127660    ,                0    ,                  0] , 
+                          [                 0 ,                 0    ,   0.060582978723404 ,                  0]])
+
+        lam[4] = 4.0
+        print lam
+        minnpr = MinnesotaPrior(yy, lam, p=1, presample_moments=premom)
+        yydum_minn, xxdum_minn = minnpr.get_pseudo_obs()
+        print yydum_minn
+        print YYdum
+        assert_almost_equal(yydum_minn, YYdum)
+        assert_almost_equal(xxdum_minn, XXdum)
+
