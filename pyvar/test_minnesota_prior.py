@@ -76,11 +76,20 @@ class TestMinnesota(TestCase):
                           [                 0 ,                 0    ,   0.060582978723404 ,                  0]])
 
         lam[4] = 4.0
-        print lam
+
         minnpr = MinnesotaPrior(yy, lam, p=1, presample_moments=premom)
         yydum_minn, xxdum_minn = minnpr.get_pseudo_obs()
-        print yydum_minn
-        print YYdum
+
         assert_almost_equal(yydum_minn, YYdum)
         assert_almost_equal(xxdum_minn, XXdum)
 
+
+        YYdum = np.loadtxt('ydu_p5.txt')
+        XXdum = np.loadtxt('xdu_p5.txt')
+        lam = np.ones((6,))
+        lam[3] = 4.0
+        minnpr = MinnesotaPrior(yy, lam, p=5, presample_moments=premom)
+        yydum_minn, xxdum_minn = minnpr.get_pseudo_obs()
+        print np.c_[YYdum, yydum_minn]
+        assert_almost_equal(yydum_minn, YYdum)
+        assert_almost_equal(xxdum_minn, XXdum)

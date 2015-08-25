@@ -881,11 +881,11 @@ class MinnesotaPrior(DummyVarPrior):
 
         subt = ny
         # scaling coefficient for higher orger lags
-        for l in np.arange(1, p - 1):
+        for l in np.arange(1, p):
             for i in np.arange(0, ny):
                 disp = subt + i
                 diag = ny * l + i
-                self.__dumx[disp, diag] = lam1 * sbar[i] * pow(2, lam2)
+                self.__dumx[disp, diag] = lam1 * sbar[i] * pow(l+1, lam2)
 
             subt += ny
 
