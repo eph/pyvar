@@ -110,6 +110,10 @@ class SimsZhaSVARPrior(Prior):
         ybar = np.atleast_1d(np.mean(np.asarray(ypre)[:p, :], 0))
         sbar = np.atleast_1d(np.std(np.asarray(Uar), 0, ddof=1)) # np.std = sqrt(sum(x-mu)**2/N)
 
+        if presample_moments is not None:
+            ybar = presample_moments[0]
+            sbar = presample_moments[1]
+
         #------------------------------------------------------------ 
         # A0 hyperparameters
         #------------------------------------------------------------
