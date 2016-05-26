@@ -435,7 +435,7 @@ class SimsZhaSVARPrior(Prior):
         #------------------------------------------------------------
         x =self.rvs(size=100, flatten=True).mean(0)
         output['npara'] = x.size
-        x = sympy.symbols(['para({:d})'.format(i+1) for i in range(x.size)])
+        x = sympy.symbols(['para({:d})'.format(i+1) for i in range(x.size)], positive=True)
         a0, aplus = self.para_trans(x, dtype=object)
 
         mat_str = lambda *x: '    {}({}, {}) = {}'.format(*x)
