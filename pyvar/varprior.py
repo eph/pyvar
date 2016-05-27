@@ -3,7 +3,7 @@ import numpy as np
 
 from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
-from distributions import NormInvWishart
+from .distributions import NormInvWishart
 
 
 def para_trans_general(f):
@@ -42,7 +42,7 @@ class Prior(object):
 class DummyVarPrior(Prior):
     """"Dummy var prior."""
     def __init__(self, ny=3, p=6, cons=True):
-        print "Initializing dummy prior."
+        print("Initializing dummy prior.")
 
         self.n = ny
         self.ny = ny
@@ -68,13 +68,13 @@ class DummyVarPrior(Prior):
 class DiffusePrior(DummyVarPrior):
 
     def __init__(self):
-        print "Initializing Diffuse Prior."
+        print("Initializing Diffuse Prior.")
 
     def get_pseudo_obs(self):
         return None, None
 
     def draw(self):
-        print "This is an improper prior."
+        print("This is an improper prior.")
 
 class SimsZhaSVARPrior(Prior):
 
@@ -397,7 +397,7 @@ class SimsZhaSVARPrior(Prior):
         try:
             os.symlink('/mq/home/m1eph00/code/fortran/base', base)
         except:
-            print "file exists"
+            print("file exists")
 
 
         output_dir = output_dir + 'model/'
@@ -782,7 +782,7 @@ class TaylorRulePrior(SimsZhaSVARPrior):
         cons_Aplus = npara-1
         r_idx = np.r_[last_col_A0, last_col_A1, cons_Aplus]
         r_idx = np.asarray(r_idx, dtype=int)
-        print 'r_idx', r_idx
+        print('r_idx', r_idx)
         #r_idx = np.array([ 3,  4,  5,  14,  15,  16,  17])
         self.r_idx = r_idx
         self.non_r_idx = np.ones((npara,), dtype=bool)

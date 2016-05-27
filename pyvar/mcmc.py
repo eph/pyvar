@@ -23,7 +23,7 @@ class MCMC:
 
     def get(self, i):
         if i > self.__nsim:
-            print "Error: i not found!"
+            print("Error: i not found!")
             return
 
         parai = self.__parasim[i]
@@ -36,4 +36,4 @@ class MCMC:
 if __name__ == "__main__":
     test = MCMC(("alpha", "beta"))
     test.append((0, 1))
-    print test.get(0)
+    print(test.get(0))

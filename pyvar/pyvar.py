@@ -5,12 +5,12 @@ import numpy.matlib as M
 import sys
 
 #from var_data import var_data, real_time_dataset
-from mcmc import MCMC
-from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
+from .mcmc import MCMC
+from .varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
 from statsmodels.tsa.tsatools import vec, vech
-from forecast_evaluation import PredictiveDensity
+from .forecast_evaluation import PredictiveDensity
 import matplotlib.pyplot as plt
-from distributions import NormInvWishart
+from .distributions import NormInvWishart
 from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
@@ -370,7 +370,7 @@ class BayesianVAR(VAR):
     @para_trans_general
     def to_state_space(self, Phi, Sigma):
 
-        print "only works for p=1]"
+        print("only works for p=1")
 
         from scipy.linalg import block_diag
         n = self._n
@@ -537,7 +537,7 @@ class ForecastingExercise:
 
     def __init__(self, rt_data, forecast_model, hmax=8):
 
-        print "Initializing a recursive forecasting exercise with %i sets of estimates." %  rt_data.size()
+        print("Initializing a recursive forecasting exercise with %i sets of estimates." %  rt_data.size())
 
         self.__nsamp = rt_data.size()
         self.__hmax = hmax
@@ -554,13 +554,13 @@ class ForecastingExercise:
             if len(forecast_model) > 1:
                 j += 1
 
-        print "DONE."
+        print("DONE.")
 
     def estimate(self, nsim=1000):
 
         self.__parasim = []
         for i in range(0, self.__nsamp):
-            print "Estimating model %i. " % i
+            print("Estimating model %i. " % i)
             self.__parasim.append(self.__model[i].estimate(nsim))
 
 
@@ -568,7 +568,7 @@ class ForecastingExercise:
         self.__yypred_dens = []
 
         for i in range(0, self.__nsamp):
-            print "Forecasting model %i. " % i
+            print("Forecasting model %i. " % i)
             yypred = self.__model[i].pred_density(self.__parasim[i], self.__hmax, nthin)
             yypred = PredictiveDensity(yypred, self.__rt_data.getFORData(i).series)
             self.__yypred_dens.append(yypred)
@@ -578,9 +578,9 @@ class ForecastingExercise:
         self.__pits = np.zeros((self.__nsamp, self.__hmax, self.__ny))
 
         for i in range(0, self.__nsamp):
-            print "Evaluating model %i. " % i
+            print("Evaluating model %i. " % i)
             self.__pits[i, ...] = self.__yypred_dens[i].get_unconditional_pits()
-            print self.__pits[i, ...]
+            print(self.__pits[i, ...])
 
     def generate_pit_plot(self, hplot=[1, 4, 8]):
         plt.figure(1)
@@ -603,7 +603,7 @@ class ForecastingExercise:
         self.__se = np.zeros((self.__nsamp, self.__hmax, self.__ny))
         self.__cse = np.zeros((self.__nsamp, self.__ny, self.__hmax, self.__ny))
         for i in range(0, self.__nsamp):
-            print "Evaluating model %i" % i
+            print("Evaluating model %i" % i)
             self.__se[i, ...] = self.__yypred_dens[i].get_unconditional_mse()
             self.__cse[i, ...] = self.__yypred_dens[i].get_conditional_mse()
 
@@ -809,7 +809,7 @@ if __name__ == "__main__":
     MN.evaluate_se()
     rmse = MN.get_rmse()
     crmse = MN.get_crmse()
-    print crmse[0, ...] / rmse
-    print crmse[1, ...] / rmse
-    print crmse[2, ...] / rmse
-    print rmse
+    print(crmse[0, ...] / rmse) 
+    print(crmse[1, ...] / rmse) 
+    print(crmse[2, ...] / rmse) 
+    print(rmse)

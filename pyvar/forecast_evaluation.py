@@ -12,7 +12,7 @@ class PredictiveDensity:
     def __init__(self, yypred, yyact):
 
         self.__nsim, self.__h, self.__ny = yypred.shape
-        print "Initializing an %i-step predictive density with %i simulations for %i variables." % (yypred.shape[1], yypred.shape[0], yypred.shape[2])
+        print ("Initializing an %i-step predictive density with %i simulations for %i variables." % (yypred.shape[1], yypred.shape[0], yypred.shape[2]))
         self.__yypred = yypred
         self.__yyact = yyact
         self.__hact, self.__nyact = yyact.shape
@@ -54,7 +54,7 @@ class PredictiveDensity:
                         pits[c, h, s] = np.sum((fcsts < self.__yyact[h, s]) * weight)
 
         elif approx_type == "NORMAL":
-            print "Not yet implemented."
+            print("Not yet implemented.")
 
         return pits
 

@@ -1,2 +1,2 @@
-from pyvar import *
-from varprior import *
+from .pyvar import *
+from .varprior import *
