@@ -23,5 +23,6 @@ install:
   - source activate test-environment
 
   # installing pyvar
+  - conda install -q anaconda-client conda-build
   - conda build conda
   - conda install pyvar --use-local
