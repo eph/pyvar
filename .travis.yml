@@ -15,14 +15,16 @@ install:
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
+  - conda install -q anaconda-client conda-build
   # Useful for debugging any issues with conda
   - conda info -a
 
   # Replace dep1 dep2 ... with your dependencies
+
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION 
   - source activate test-environment
 
   # installing pyvar
-  - conda install -q anaconda-client conda-build
+
   - conda build conda
   - conda install pyvar --use-local
