@@ -28,3 +28,6 @@ install:
 
   - conda build conda
   - conda install pyvar --use-local
+
+script:
+  - pwd
