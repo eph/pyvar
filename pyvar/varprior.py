@@ -5,7 +5,6 @@ from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
 from .distributions import NormInvWishart
 
-
 def para_trans_general(f):
     """
     This is a generic decorator to map a vector theta describing the

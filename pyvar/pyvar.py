@@ -196,6 +196,38 @@ class BayesianVAR(VAR):
 
     @para_trans_general     #@to_reduced_form
     def reduced_form_irf(self, phi, sigma, h=8): 
+        A0i = np.linalg.cholesky(sigma).T
+
+        y = np.zeros((self._ny, h, self._ny))
+        x = np.zeros((self._ny*self._p + self._cons))
+
+
+        nx = x.shape[0]
+        for i in range(self._ny):
+            QQ = np.zeros((self._ny))
+            QQ[i] = 1.0
+
+            impact = QQ.dot(A0i)
+            y[i, 0, :] = impact
+
+            for j in range(1, h):
+
+                if self.p > 0:
+                    #x[ :(self.ny * (self.p - 1))] = x[(self.ny):(nx-self.cons)]
+                    #x[ (self.ny * (self.p - 1)):-1] = y[i, j-1, :]
+                    #x[ (self.ny * (self.p - 1)):-(1)] = y[i, j-1, :]
+                    x[self._ny:-self._cons] = x[:-(self._ny+self._cons)]
+                    x[:self._ny] = y[i, j-1, :]
+
+                else:
+                    x = y[i, j-1, :]
+
+                y[i, j, :] = x.dot(phi)
+
+        return y
+
+
+
         pass
         
     @para_trans_general     #@to_reduced_form

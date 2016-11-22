@@ -17,3 +17,4 @@ requirements:
     - statsmodels
     - sympy
     - matplotlib
+    - tornado
