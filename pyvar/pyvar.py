@@ -9,7 +9,6 @@ from .mcmc import MCMC
 from .varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
 from statsmodels.tsa.tsatools import vec, vech
 from .forecast_evaluation import PredictiveDensity
-import matplotlib.pyplot as plt
 from .distributions import NormInvWishart
 from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
