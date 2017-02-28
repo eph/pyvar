@@ -5,6 +5,9 @@ from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
 from .distributions import NormInvWishart
 
+import pkg_resources
+SVAR_FILE = pkg_resources.resource_filename('pyvar','svar.f90')
+
 def para_trans_general(f):
     """
     This is a generic decorator to map a vector theta describing the
@@ -372,42 +375,40 @@ class SimsZhaSVARPrior(Prior):
 
     def fortran(self, data, name='svar', output_dir='/mq/scratch/m1eph00/mp-premia/svar/'):
 
-        import os
-        try:
-            os.mkdir(output_dir)
-        except:
-            pass
-        with open('/mq/home/m1eph00/python-repo/dsge/dsge/templates/smc_driver_mpi.f90') as f:
-            smc = f.read()
+        # import os
+        # try:
+        #     os.mkdir(output_dir)
+        # except:
+        #     pass
+        # with open('/mq/home/m1eph00/python-repo/dsge/dsge/templates/smc_driver_mpi.f90') as f:
+        #     smc = f.read()
 
-        smc = smc.replace('call read_in_from_files()', 'call load_data()')
-        smc = smc.replace('100f', '200f')
+        # smc = smc.replace('call read_in_from_files()', 'call load_data()')
+        # smc = smc.replace('100f', '200f')
         
-        with open(output_dir + 'smc_driver_mpi.f90', 'w') as f:
-            f.write(smc.format(model=name))
+        # with open(output_dir + 'smc_driver_mpi.f90', 'w') as f:
+        #     f.write(smc.format(model=name))
 
-        with open('/mq/home/m1eph00/python-repo/dsge/dsge/templates/Makefile_dsge') as f:
-            makefile = f.read()
+        # with open('/mq/home/m1eph00/python-repo/dsge/dsge/templates/Makefile_dsge') as f:
+        #     makefile = f.read()
 
-        makefile = makefile.replace('-O3 -xHost -ipo', '')
+        # makefile = makefile.replace('-O3 -xHost -ipo', '')
         
-        with open(output_dir + 'Makefile', 'w') as f:
-            f.write(makefile.format(model=name))
+        # with open(output_dir + 'Makefile', 'w') as f:
+        #     f.write(makefile.format(model=name))
 
-        base = os.path.join(output_dir, 'base')
-        try:
-            os.symlink('/mq/home/m1eph00/code/fortran/base', base)
-        except:
-            print("file exists")
-
-
-        output_dir = output_dir + 'model/'
-        try:
-            os.mkdir(output_dir)
-        except:
-            pass
+        # base = os.path.join(output_dir, 'base')
+        # try:
+        #     os.symlink('/mq/home/m1eph00/code/fortran/base', base)
+        # except:
+        #     print("file exists")
 
 
+        # output_dir = output_dir + 'model/'
+        # try:
+        #     os.mkdir(output_dir)
+        # except:
+        #     pass
         
 
         output = {}
@@ -441,14 +442,14 @@ class SimsZhaSVARPrior(Prior):
 
         mat_str = lambda *x: '    {}({}, {}) = {}'.format(*x)
         A0str = [mat_str('A0', i+1, j+1, sympy.fcode(value, source_format='free'))
-                 for (i, j), value in np.ndenumerate(a0) if value > 0]
+                 for (i, j), value in np.ndenumerate(a0)]
         Apstr = [mat_str('F', i+1, j+1, sympy.fcode(value, source_format='free'))
-                 for (i, j), value in np.ndenumerate(aplus) if value > 0]
+                 for (i, j), value in np.ndenumerate(aplus)]
 
 
         output['assign_para'] = '\n'.join(A0str + Apstr)
 
-        with open('/mq/home/m1eph00/python-repo/var/pyvar/svar.f90', 'r') as f:
+        with open(SVAR_FILE, 'r') as f:
             svar = f.read()
 
         with open(output_dir + name + '.f90', 'w') as f:
@@ -799,7 +800,7 @@ class MinnesotaPrior(DummyVarPrior):
         ny = ybar.size
 
 
-        dumr = ny * 2 + lam3*ny + ny * (p-1) + cons
+        dumr = int(ny * 2 + lam3*ny + ny * (p-1) + cons)
         self.__dumy = np.mat(np.zeros((dumr, ny)))
         self.__dumx = np.mat(np.zeros((dumr, ny * p + cons)))
 

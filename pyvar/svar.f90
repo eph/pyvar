@@ -30,6 +30,7 @@ module model_t
      procedure logpdf
      procedure para_to_sigma_phi
      procedure construct_prior_hyper
+
   end type minnesota_prior
 
   interface minnesota_prior
@@ -79,7 +80,7 @@ contains
 
     self%XX_lik = 1.0_wp
     do i = 1, self%likT
-       self%YY_lik(i,:) = self%YY(:,self%p+1)
+       self%YY_lik(i,:) = self%YY(:,self%p+i)
        do j = 1, self%p
           self%XX_lik(i,(j-1)*self%nobs+1:j*self%nobs) = self%YY(:,i-j+self%P)
        end do
@@ -112,8 +113,8 @@ contains
 
     likvec = -ny / 2.0_wp*log(2.0_wp*M_PI)
 
-    call dgetrf(ny,ny,SIGMA,ny,ipiv,info)
-    call dgetri(ny,SIGMA,ny,ipiv,work,3*ny,info)
+    ! call dgetrf(ny,ny,SIGMA,ny,ipiv,info)
+    ! call dgetri(ny,SIGMA,ny,ipiv,work,3*ny,info)
 
 
     associate(prior => self%prior)
@@ -127,8 +128,8 @@ contains
     end associate
        
     A0 = sigma
-    call dgetrf(ny,ny,sigma,ny,ipiv,info)
-    call dgetri(ny,sigma,ny,ipiv,work,3*ny,info)
+    call dgetrf(ny,ny,A0,ny,ipiv,info)
+    call dgetri(ny,A0,ny,ipiv,work,3*ny,info)
     call cholesky(A0, info)
 
     call dgemm('n','n',nF/ny,ny,ny,1.0_wp,phi,nF/ny,A0,ny,0.0_wp,F,nF/ny)
