@@ -14,26 +14,6 @@ from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
 
-# class MSVAR(object):
-
-#     def __init__(self, ny=3, p=5, cons=True, ns_mu=1, ns_var=2):
-
-#         self.short_names = []
-#         self.tex_names = []
-
-#         Astr = "A[s={:d}][{:d},{:d}]"
-#         Atex = r"A\left(s_{\mu}={:d})_{{0, {:d}{:d}}}\right)"
-#         self.cols = [[] for _ in range(ny)]
-        
-#         for s in range(ns_mu):
-#             for j in range(ny):
-#                 lena = j+1
-#                 for i in range(lena):
-#                     self.short_names.append(Astr.format(s, i, j))
-#                     self.cols[]
-#                     self.tex_names.append(Atex.format(s, i, j))
-
-#         Fstr = r"Fs_{\mu})[{:d},{:d}]"
 
 class VAR(object):
     """
@@ -155,9 +135,9 @@ class BayesianVAR(VAR):
         if self._cons is True:
             xest = add_constant(xest, prepend=False)
 
-        if not ydum == None:
-            yest = np.vstack((ydum, yest))
-            xest = np.vstack((xdum, xest))
+        #if not (ydum == None).all():
+        #    yest = np.vstack((ydum, yest))
+        #    xest = np.vstack((xdum, xest))
 
 
         # This is just a random initialization point....

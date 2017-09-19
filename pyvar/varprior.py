@@ -83,7 +83,8 @@ class DiffusePrior(DummyVarPrior):
 class SimsZhaSVARPrior(Prior):
 
     def __init__(self, ypre, hyperpara, p=3, cons=True, ar_lp=6,
-                 presample_moments=None, restriction='upper_triangle'):
+                 presample_moments=None, restriction='upper_triangle',
+                 use_mu4=True):
 
         
         lam0 = hyperpara[0]
@@ -99,7 +100,7 @@ class SimsZhaSVARPrior(Prior):
         mu2 = 1.0/lam2
         mu3 = -lam3
         mu4 = 1.0/lam4
-
+        
         ypre = np.array(ypre)
         T, ny = ypre.shape
         k = ny*p + cons
@@ -144,8 +145,8 @@ class SimsZhaSVARPrior(Prior):
                 for l in np.arange(p):
                     Xid[ny*l+r, ny*l+r] = mu0*mu1*mu2*sbar[r] / ((l+1)**mu3)
 
-            Xid[-(ny+2), -1] = mu0*mu4
-
+            if use_mu4: Xid[-(ny+2), -1] = mu0*mu4
+            
             Yid[-(ny+1):-1, :] = np.diag(mu5*ybar)
             Xid[-(ny+1):-1, :][:, :(k-1)] = np.tile(mu5*np.diag(ybar), p)
 

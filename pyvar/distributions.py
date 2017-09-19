@@ -83,14 +83,15 @@ class NormInvWishart(object):
         return BETA, SIGMA
 
     def rvs(self, ndraw):
-        betas = []
-        sigmas = []
-        for i in range(ndraw):
+        betas = np.zeros((ndraw, self.r, self.c))
+        sigmas = np.zeros((ndraw, self.iw.p, self.iw.p))
+        from tqdm import tqdm
+        for i in tqdm(range(ndraw)):
             b, s = self.draw()
-            betas.append(b)
-            sigmas.append(s)
+            betas[i,:,:] = b
+            sigmas[i,:,:] = s
 
-        return np.array(betas), np.array(sigmas)
+        return betas, sigmas
 
     def logpdf(self, BETA, SIGMA):
         BETA = np.ravel(BETA, order='F')

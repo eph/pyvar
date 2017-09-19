@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 import pandas as p
 
-from numpy.testing import assert_equal
+from numpy.testing import assert_equal, assert_almost_equal
 
 from unittest import TestCase
 
@@ -18,5 +18,9 @@ class TestSZ(TestCase):
         hyper[3] = 1.2
         hyper[5] = 0.1
         
-        sz = SimsZhaSVARPrior(yy, hyper, p=1)
+        sz = SimsZhaSVARPrior(yy, hyper, p=5)
 
+        cholAF = np.linalg.cholesky(sz.sigma)
+
+        truth = np.loadtxt('AFsigma.txt')[:54]
+        assert_almost_equal(cholAF, truth)

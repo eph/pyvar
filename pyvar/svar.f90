@@ -49,7 +49,6 @@ module model_t
 
    contains
      procedure :: lik
-
   end type model
 
   interface model
