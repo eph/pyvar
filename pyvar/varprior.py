@@ -790,7 +790,7 @@ class MinnesotaPrior(DummyVarPrior):
         lam5 = hyperpara[4]
         tau = hyperpara[5]
 
-        if presample_moments==None:
+        if presample_moments is None:
             ybar = np.atleast_1d(np.mean(np.asarray(ypre), 0))
             sbar = np.atleast_1d(np.std(np.asarray(ypre), 0))
 

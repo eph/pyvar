@@ -136,8 +136,8 @@ class BayesianVAR(VAR):
             xest = add_constant(xest, prepend=False)
 
         #if not (ydum == None).all():
-        #    yest = np.vstack((ydum, yest))
-        #    xest = np.vstack((xdum, xest))
+        yest = np.vstack((ydum, yest))
+        xest = np.vstack((xdum, xest))
 
 
         # This is just a random initialization point....

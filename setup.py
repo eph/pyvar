@@ -4,7 +4,7 @@ import numpy.distutils.core
 if __name__ == "__main__":
     numpy.distutils.core.setup(
         name='pyvar',
-        version='0.0.1',
+        version='0.0.2',
         platforms='linux',
         packages=['pyvar'], 
         package_data={'pyvar': ['svar.f90']},
