@@ -11,10 +11,11 @@ requirements:
     - numpy 
 
   run:
-    - pandas
+    - python
     - numpy
     - scipy
-    - statsmodels
+    - pandas
     - sympy
-    - matplotlib
+    - statsmodels
+
 
