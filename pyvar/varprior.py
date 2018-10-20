@@ -800,8 +800,8 @@ class MinnesotaPrior(DummyVarPrior):
 
         ny = ybar.size
 
-
-        dumr = int(ny * 2 + lam3*ny + ny * (p-1) + cons)
+        
+        dumr = int(ny * 2 + lam3*ny + ny * (p-1)) # + cons)
         self.__dumy = np.mat(np.zeros((dumr, ny)))
         self.__dumx = np.mat(np.zeros((dumr, ny * p + cons)))
 
