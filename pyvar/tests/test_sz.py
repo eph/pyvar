@@ -7,12 +7,16 @@ from numpy.testing import assert_equal, assert_almost_equal
 
 from unittest import TestCase
 
-from varprior import SimsZhaSVARPrior
+from pyvar import SimsZhaSVARPrior
+
+import os
+path = os.path.abspath(__file__)
+dir_path = os.path.dirname(path)
 
 class TestSZ(TestCase):
 
     def test_sz_prior(self):
-        yy = p.read_csv('/mq/home/m1eph00/projects/var-smc/var_smc_working/lib_var/sz_2008_joe_data.csv')
+        yy = p.read_csv(os.path.join(dir_path,'sz_2008_joe_data.csv'))
 
         hyper = np.ones((7, )) 
         hyper[3] = 1.2
@@ -22,5 +26,5 @@ class TestSZ(TestCase):
 
         cholAF = np.linalg.cholesky(sz.sigma)
 
-        truth = np.loadtxt('AFsigma.txt')[:54]
-        assert_almost_equal(cholAF, truth)
+        truth = np.loadtxt(os.path.join(dir_path,'AFsigma.txt'))[:54]
+        assert_almost_equal(cholAF, truth, decimal=2)
