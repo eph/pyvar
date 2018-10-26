@@ -44,7 +44,7 @@ class Prior(object):
 class DummyVarPrior(Prior):
     """"Dummy var prior."""
     def __init__(self, ny=3, p=6, cons=True):
-        print("Initializing dummy prior.")
+        #print("Initializing dummy prior.")
 
         self.n = ny
         self.ny = ny
