@@ -5,9 +5,9 @@ import numpy.matlib as M
 import sys
 
 #from var_data import var_data, real_time_dataset
-from varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
+from .varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
 from statsmodels.tsa.tsatools import vec, vech
-from distributions import NormInvWishart
+from .distributions import NormInvWishart
 from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln

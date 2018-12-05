@@ -3,7 +3,7 @@ import numpy as np
 
 from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
-from pyvar.distributions import NormInvWishart
+from .distributions import NormInvWishart
 
 import pkg_resources
 SVAR_FILE = pkg_resources.resource_filename('pyvar','svar.f90')

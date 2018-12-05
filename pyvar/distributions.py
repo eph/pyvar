@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 import scipy.stats as rv
 from scipy.stats import chi2
