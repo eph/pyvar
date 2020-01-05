@@ -788,37 +788,4 @@ class MixtureVAR(object):
     #         lnpy1 = self.var_models[m].logpost(BETA, SIGMA)
 
 
-if __name__ == "__main__":
-    # generate trajectories
-    data_set = var_data.read_from_csv(filename="3eqvar.csv", header=True, freq="quarterly", start="1965q2")
-    rt_data = real_time_dataset(data_set, estart="1996q1", t0="1983q1")
-    unifpr = DiffusePrior()             # initialize uniform prior
 
-    # Minnesota Prior
-    lam1 = 5.0
-    lam2 = 0.5
-    lam3 = 1.0
-    lam4 = 1.0
-    lam5 = 5.0
-    tau = 0
-    hyperpara = np.array([lam1, lam2, lam3, lam4, lam5, tau])
-    minnpr = MinnesotaPrior(data_set.series[1:16, :], hyperpara, p=4)
-
-    bvar_set = []
-    for i in np.arange(0, rt_data.size()):
-        presamp = rt_data.getVARData(i).series
-        #minnpr = MinnesotaPrior(presamp[1:16, :], hyperpara, p=4)
-        bvar_set.append(BayesianVAR(unifpr, ny=3, p=0, cons=True, rw=True))
-
-    MN = ForecastingExercise(rt_data, bvar_set)
-    MN.estimate(nsim=1000)
-    MN.generate_forecast()
-    MN.evaluate_forecast()
-    MN.generate_pit_plot()
-    MN.evaluate_se()
-    rmse = MN.get_rmse()
-    crmse = MN.get_crmse()
-    print(crmse[0, ...] / rmse) 
-    print(crmse[1, ...] / rmse) 
-    print(crmse[2, ...] / rmse) 
-    print(rmse)
