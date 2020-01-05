@@ -270,7 +270,7 @@ class BayesianVAR(VAR):
         xest, yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
 
         T     = yest.shape[0]
-        Tstar = ydum.shape[0]
+        Tstar = ydum.shape[0] 
         Tbar  = Tstar + T
         self._n = self._ny
         if self._cons is True:
