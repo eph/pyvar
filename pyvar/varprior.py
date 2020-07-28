@@ -61,9 +61,9 @@ class DummyVarPrior(Prior):
             n = self.n
             p = self.p
             cons = self.cons
-            Phi = np.reshape(theta[:n**2 * p + n * (if cons is True)],
-                             (n * p + 1 * (if cons is True), n), order='F')
-            Sigma = theta[n**2 * p + n * (if cons is True):]
+            Phi = np.reshape(theta[:n**2 * p + n * (cons is True)],
+                             (n * p + 1 * (cons is True), n), order='F')
+            Sigma = theta[n**2 * p + n * (cons is True):]
             Sigma = np.choose(self.sigma_choose, Sigma)
         else:
             Phi = args[0]
