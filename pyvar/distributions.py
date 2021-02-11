@@ -1,57 +1,57 @@
 import numpy as np
 import scipy.stats as rv
-from scipy.stats import chi2
 from scipy.special import multigammaln
 
-class InvWishart(object):
+# class InvWishart(object):
 
-    def _check_parameters(self, psi, nu):
-        p = psi.shape[0]
-        if p is not psi.shape[1]:
-            raise ValueError('psi must be a square matrix!')
-        if nu < p - 1:
-            raise ValueError('nu must be greater than p - 1!')
-        return p
+#     def _check_parameters(self, psi, nu):
+#         p = psi.shape[0]
+#         if p is not psi.shape[1]:
+#             raise ValueError('psi must be a square matrix!')
+#         if nu < p - 1:
+#             raise ValueError('nu must be greater than p - 1!')
+#         return p
 
-    def __init__(self, psi, nu):
-        r"""
-        This creates a frozen inverse wishart distribution.
-        """
-        self.p = self._check_parameters(psi, nu)
-        self.psi = psi
-        self.nu = nu
-        self.inv_psi = np.linalg.inv(psi)
-        self.chol_inv_psi = np.linalg.cholesky(self.inv_psi)
+#     def __init__(self, psi, nu):
+#         r"""
+#         This creates a frozen inverse wishart distribution.
+#         """
+#         self.p = self._check_parameters(psi, nu)
+#         self.psi = psi
+#         self.nu = nu
+#         self.inv_psi = np.linalg.inv(psi)
+#         self.chol_inv_psi = np.linalg.cholesky(self.inv_psi)
 
-        # constants
-        self.logdetpsi = np.log(np.linalg.det(self.psi))
-        self.gamma_const = multigammaln(self.nu/2,self.p)
+#         # constants
+#         self.logdetpsi = np.log(np.linalg.det(self.psi))
+#         self.gamma_const = multigammaln(self.nu/2,self.p)
 
-        self.lik_const = ( -(self.nu*self.p)/2.0 * np.log(2)
-                           - self.gamma_const
-                           + self.nu/2. * self.logdetpsi )
+#         self.lik_const = ( -(self.nu*self.p)/2.0 * np.log(2)
+#                            - self.gamma_const
+#                            + self.nu/2. * self.logdetpsi )
         
-    def rvs(self, ndraw=1):
-        """This all could be optimized."""
-        return np.array([self.draw() for _ in range(ndraw)])
+#     def rvs(self, ndraw=1):
+#         """This all could be optimized."""
+#         return np.array([self.draw() for _ in range(ndraw)])
 
 
-    def draw(self):
-        """A single draw"""
-        Z = np.dot(self.chol_inv_psi,
-                   rv.norm.rvs(size=(self.p, self.nu)))
-        W = np.dot(Z, Z.T)
-        IW = np.linalg.inv(W)
-        return IW
+#     def draw(self):
+#         """A single draw"""
+#         Z = np.dot(self.chol_inv_psi,
+#                    rv.norm.rvs(size=(self.p, self.nu)))
+#         W = np.dot(Z, Z.T)
+#         IW = np.linalg.inv(W)
+#         return IW
 
-    def logpdf(self, x):
+#     def logpdf(self, x):
         
-        logdetx = np.log(np.linalg.det(x))
+#         logdetx = np.log(np.linalg.det(x))
 
-        lpdf = self.lik_const - (self.nu + self.p + 1)/2.0*logdetx \
-               - 0.5*np.trace(np.dot(self.psi, np.linalg.inv(x)))
+#         lpdf = self.lik_const - (self.nu + self.p + 1)/2.0*logdetx \
+#                - 0.5*np.trace(np.dot(self.psi, np.linalg.inv(x)))
 
-        return lpdf
+#         return lpdf
+from scipy.stats import invwishart as InvWishart
 
 
 class NormInvWishart(object):
@@ -59,9 +59,9 @@ class NormInvWishart(object):
     def _check_parameters(self, mu, omega):
         pass
 
-    def __init__(self, mu, omega, psi, nu):
+    def __init__(self, mu, omega, Ψ, ν):
 
-        self.iw = InvWishart(psi, nu)
+        self.iw = InvWishart(scale=Ψ, df=int(ν))
         self.mu = mu
         self.omega = omega
         self.inv_omega = np.linalg.inv(omega)
@@ -74,7 +74,7 @@ class NormInvWishart(object):
 
 
     def draw(self):
-        SIGMA = self.iw.draw()
+        SIGMA = self.iw.rvs()
         mvn_covar = np.kron(SIGMA, self.inv_omega)
 
         BETA = np.random.multivariate_normal(self.mu, mvn_covar)
@@ -83,7 +83,7 @@ class NormInvWishart(object):
 
     def rvs(self, ndraw):
         betas = np.zeros((ndraw, self.r, self.c))
-        sigmas = np.zeros((ndraw, self.iw.p, self.iw.p))
+        sigmas = np.zeros((ndraw, self.iw.dim, self.iw.dim))
         from tqdm import tqdm
         for i in tqdm(range(ndraw)):
             b, s = self.draw()
