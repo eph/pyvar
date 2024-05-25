@@ -279,16 +279,19 @@ class BayesianVAR(VAR):
         yest = np.vstack((ydum, yest))
         xest = np.vstack((xdum, xest))
 
-        logdetx    = np.log(np.linalg.det(xest.T.dot(xest)))
-        logdetxdum = np.log(np.linalg.det(xdum.T.dot(xdum)))
+        XtX, Xty = (xest.T @ xest, xest.T @ yest)
+        logdetx = 2*np.sum(np.log(np.linalg.cholesky(XtX).diagonal()))
+        phihatT = np.linalg.solve(XtX, Xty)
+        S = yest.T @ yest - phihatT.T @ XtX @ phihatT
+        logdets = 2*np.sum(np.log(np.linalg.cholesky(S).diagonal()))
+       
+       
+        XtXdum, Xtydum = (xdum.T @ xdum, xdum.T @ ydum)
+        logdetxdum = 2*np.sum(np.log(np.linalg.cholesky(XtXdum).diagonal()))
+        phidumT = np.linalg.solve(XtXdum, Xtydum)
+        Sdum = ydum.T @ ydum - phidumT.T @ XtXdum @ phidumT
+        logdetsdum = 2*np.sum(np.log(np.linalg.cholesky(Sdum).diagonal()))
 
-        phihatT = np.linalg.solve(xest.T.dot(xest), xest.T.dot(yest))
-        S = (yest - xest.dot(phihatT)).T.dot(yest - xest.dot(phihatT))
-        logdets = np.log(np.linalg.det(S))
-
-        phidumT = np.linalg.solve(xdum.T.dot(xdum), xdum.T.dot(ydum))
-        Sdum = (ydum - xdum.dot(phidumT)).T.dot (ydum - xdum.dot(phidumT))
-        logdetsdum = np.log(np.linalg.det(Sdum))
         k = self._n * self._p + 1*(self._cons is True)
 
         kap = 0
@@ -299,10 +302,8 @@ class BayesianVAR(VAR):
 
         lnpy = (-self._n*T/2.0*np.log(np.pi)
                 -self._n/2.0*logdetx -(Tbar - k)/2.0*logdets
-                #+self._n*(Tbar - k)/2.0*np.log(2.0)
                 + kap - kapdum
                 + self._n/2.0*logdetxdum + (Tstar - k)/2.0*logdetsdum
-                #-self._n*(Tstar - k)/2.0*np.log(2.0) )
                 )
         return lnpy
 
