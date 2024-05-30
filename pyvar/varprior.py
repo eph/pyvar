@@ -1,5 +1,6 @@
-from __future__ import division
+#import typing
 import numpy as np
+from numpy.lib.arraypad import _pad_simple
 
 from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
@@ -47,9 +48,7 @@ class Prior(object):
 class DummyVarPrior(Prior):
     """"Dummy var prior."""
 
-    def __init__(self, ny=3, p=6, cons=True):
-        # print("Initializing dummy prior.")
-
+    def __init__(self, ny: int = 3, p: int=1, cons:bool=True):
         self.n = ny
         self.ny = ny
         self.p = p
@@ -70,7 +69,7 @@ class DummyVarPrior(Prior):
             Sigma = args[1]
         return Phi, Sigma
 
-    def get_pseudo_obs(self):
+    def get_pseudo_obs(self: Prior):
         return None, None
 
 
@@ -461,6 +460,78 @@ class SimsZhaSVARPrior(Prior):
         with open(output_dir + name + '.f90', 'w') as f:
             f.write(svar.format(**output))
 
+# construct the likelihood for 
+# y = X*B + e, e ~ N(0, R)
+# using tensorflow
+def tensorflow_likelihood(y, X, B, R):
+    resid = y - X.dot(B)
+    return -0.5 * tf.reduce_sum(tf.square(resid) / R)
+    
+
+
+
+class GiannoneLenzaPrimiceri(DummyVarPrior):
+
+
+    def __init__(self, yy, hyperpara, p=3, const=True,d=None):
+
+        self.T, self.n = yy.shape
+        self.p = p
+        self.const = const
+        self.d = d
+
+        self.m = self.n * self.p + self.const
+
+        if d is None:
+            d = n+2
+        else:
+            pass
+
+
+    def gamma_to_parameters(self, γ):
+        λ = γ[0]
+        μ = γ[1]
+        δ = γ[2]
+        ψ = γ[-self.n:]
+        
+        psi = np.reshape(γ[3:3+self.n*self.p], (self.n, self.p), order='F')
+        
+        return (λ, μ, δ, ψ)
+
+    def log_likelihood(self, γ):
+
+        (λ, μ, δ, ψ) = self.gamma_to_parameters(γ)
+        
+        Ψ = np.diag(ψ)
+
+        const = np.log(λ) + np.log(μ) + np.log(δ) + np.log(np.linalg.det(Ψ))
+
+        B = np.linalg.inv(Ψ)
+        Ω = np.linalg.inv(np.eye(self.n) - δ * B)
+
+    def estimate_hyperparameters(self): 
+        pass 
+
+    # write gibbs sampler to estimate lambda, mu, delta, and psi    
+    def gibbs_sampler(self, ndraws=1000):
+        """
+        Gibbs sampler for the parameters of the gamma distribution
+        """
+        γ = np.zeros((ndraws, self.m))
+        γ[0, :] = np.random.gamma(1, 1, size=self.m)
+        for i in range(1, ndraws):
+            γ[i, :] = self.gamma_to_parameters(γ[i - 1, :])
+            γ[i, :] = np.random.gamma(γ[i, :])
+
+            # do the metroplis hastings step
+            if np.random.uniform() < np.exp(self.log_likelihood(γ[i, :]) - self.log_likelihood(γ[i - 1, :])):
+                γ[i, :] = γ[i - 1, :]
+                accept = True
+            else:
+                accept = False
+
+        return γ
+        
 
 class MinnesotaPrior(DummyVarPrior):
     """A class for the Minnesota Prior."""
@@ -562,7 +633,7 @@ class MinnesotaPrior(DummyVarPrior):
 
         self.frozen_dist = NormInvWishart(
             self.Phi_star, self.Omega, self.Psi, self.nu)
-        #self.frozen_dist = NormInvWishart(self.Phi_star, self.Omega, self.Psi, 4)
+
 
         # for picking out sigma
         self.n = ny
@@ -592,7 +663,7 @@ class MinnesotaPrior(DummyVarPrior):
 
     @property
     def Phi_star(self):
-        return solve(self.Omega, np.dot(self.__dumx.T, self.__dumy))
+        return np.linalg.solve(self.Omega, np.dot(self.__dumx.T, self.__dumy))
 
     @property
     def Psi(self):

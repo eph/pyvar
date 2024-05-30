@@ -1,17 +1,12 @@
-from __future__ import division
 import numpy as np
-import scipy as sp
-import numpy.matlib as M
-import sys
 
-#from var_data import var_data, real_time_dataset
 from .varprior import DiffusePrior, MinnesotaPrior, Prior, para_trans_general, to_reduced_form
 from statsmodels.tsa.tsatools import vec, vech
 from .distributions import NormInvWishart
 from statsmodels.tsa.tsatools import lagmat
 from statsmodels.tools.tools import add_constant
 from scipy.special import gammaln
-
+from scipy.linalg import block_diag
 
 class VAR(object):
     """
@@ -21,7 +16,7 @@ class VAR(object):
     u_t\sim iid\mathcal{N}(0, \Sigma)
     """
 
-    def __init__(self, ny=3, p=4, cons=True):
+    def __init__(self, ny=3, p=4, cons=True, data=None):
         """
         Initializes the VAR.
 
@@ -38,8 +33,40 @@ class VAR(object):
         self.p = p
         self.cons = cons
 
-    @staticmethod
-    def simulate_data(phi, sigma, cons=True, n=100):
+        if not (data is None):
+            self.data = data
+            self.xest, self.yest = lagmat(data, maxlag=self.p, trim="both", original="sep")
+            if self._cons == True:
+                self.xest = add_constant(self.xest, prepend=False)
+
+    def companion_form(self, phi):
+        if self.cons:
+            μ = phi[-1, :]
+        else:
+            μ = np.zeros((self.n))
+
+        if self.p == 0:
+            TT = np.zeros((self.n, self.n))
+        else:
+            phis = [phi[i*self.n:(i+1)*self.n,:].T for i in range(self.p)]
+            TT = block_diag(*phis)
+
+
+        CC = np.zeros(TT.shape[0])
+        CC[:self.n] = μ
+
+        RR = np.zeros((max(self.p, 1)*self.n, self.n))
+        RR[:self.n, :self.n] = np.eye(self.n)
+
+        return CC, TT, RR
+
+    def eigvals(self, phi):
+        return np.linalg.eigvals(self.companion_form(phi)[1])
+
+    def is_stationary(self, phi):
+        return np.all(np.abs(self.eigvals(phi)) < 1)
+
+    def simulate_data(self, phi, sigma, T=100, init='mean'):
         """
         Takes a given VAR parameterization and simulates data, starting at the implied unconditional mean.
 
@@ -47,43 +74,31 @@ class VAR(object):
         phi -- A matrix ..math:: k\times n where ..math::k=np+1 or ..math::k=np depending on whether or not a constant is included.  The matrix is populated as
         .. math ::
         \Phi = \left[\Phi_1, \ldots, \Phi_p, \Phi_c\right]'
-        #sigma -- vech(\Sigma), an ..math::n(n+1)/2 array containing the unique elements of \Sigma, the covariance matrix of the reduced form shocks.
         sigma -- \Sigma, a symmetric ..math::n^2 covariance matrix of reducded form shocks.
 
         >>> y = VAR.simulate_data(np.array((0.95)), np.array((0)))
         """
-        phi = np.asarray(phi, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
-        ny = sigma.shape[0]
+        CC, TT, RR = self.companion_form(phi)
+
+        is_stationary == self.is_stationary(phi)
 
 
+    def mle(self, y=None):
+        """MLE."""
+        if y is None:
+            y = self.data
 
-        if cons:
-            p = (phi.shape[0] - 1) / ny
-        else:
-            p = phi.shape[0] / ny
-            phi = np.vstack((phi, np.mat(np.zeros(1, ny))))
+        x, y = lagmat(y, maxlag=self._p, trim="both", original="sep")
 
-        if p > 0:
-            coef_sum = phi[:, -1].T * M.repmat(M.eye(ny), p, 1)
-        else:
-            coef_sum = 0
+        if self._cons is True:
+            x = add_constant(x, prepend=False)
 
-        muy = np.linalg.solve(M.eye(ny) - coef_sum, phi[:, -1].T)
+        beta = np.linalg.solve(x.T.dot(x), x.T.dot(y))
+        S = (y - x.dot(beta)).T.dot(y - x.dot(beta))/y.shape[0]
 
-        y = var_data.empty(ny, n)
-        y.series[0:p, :] = muy.T
+        return (beta, S)
 
-        x = y.mlag(p, cons)
-        for i in np.arange(p, n):
-            y.series[i, :] = (x[i, :] * phi
-                              + np.mat(randn(np.zeros(ny), sigma)))
 
-            if i < n - 1:
-                x[i+1, cons:(cons+ny*(p-1))] = x[i, (cons+ny):]
-                x[i+1, (cons+ny*(p-1)):] = y.series[i, :]
-
-        return y
 
 
     def __repr__(self):
@@ -97,31 +112,10 @@ class BayesianVAR(VAR):
     def __init__(self, prior, y):
         """Initialization."""
         self._prior = prior
-        self.data = y
-        #self.sigma_choose = prior.sigma_choose
         self.para_trans = prior.para_trans
         self.reduced_form = prior.reduced_form
-        super(BayesianVAR, self).__init__(prior.ny, prior.p, prior.cons)
+        super(BayesianVAR, self).__init__(prior.ny, prior.p, prior.cons, y)
         
-        self.xest, self.yest = lagmat(y, maxlag=self._p, trim="both", original="sep")
-        if self._cons == True:
-            self.xest = add_constant(self.xest, prepend=False)
-            
-    # Temporary fix -- need to inherit from prior 
-    # def para_trans(self,*args,**kwargs):
-    #     if len(args) == 1:
-    #         theta = args[0]
-    #         n = self.n
-    #         p = self.p
-    #         cons = self.cons
-    #         Phi = np.reshape(theta[:n**2*p+n*(cons==True)], (n*p+1*(cons==True),n),order='F')
-    #         Sigma = theta[n**2*p+n*(cons==True):]
-    #         Sigma = np.choose(self.sigma_choose, Sigma)
-    #     else:
-    #         Phi = args[0]
-    #         Sigma = args[1]
-    #     return Phi, Sigma
-
     def sample(self, nsim=1000, y=None,flatten_output=False):
 
         if y is None:
@@ -190,9 +184,6 @@ class BayesianVAR(VAR):
             for j in range(1, h):
 
                 if self.p > 0:
-                    #x[ :(self.ny * (self.p - 1))] = x[(self.ny):(nx-self.cons)]
-                    #x[ (self.ny * (self.p - 1)):-1] = y[i, j-1, :]
-                    #x[ (self.ny * (self.p - 1)):-(1)] = y[i, j-1, :]
                     x[self._ny:-self._cons] = x[:-(self._ny+self._cons)]
                     x[:self._ny] = y[i, j-1, :]
 
@@ -239,22 +230,6 @@ class BayesianVAR(VAR):
             else:
                 x = y[i, :]
         return y
-
-    def mle(self, y=None):
-        """MLE."""
-        if y is None:
-            y = self.data
-
-        x, y = lagmat(y, maxlag=self._p, trim="both", original="sep")
-
-        if self._cons is True:
-            x = add_constant(x, prepend=False)
-
-        beta = np.linalg.solve(x.T.dot(x), x.T.dot(y))
-        S = (y - x.dot(beta)).T.dot(y - x.dot(beta))/y.shape[0]
-
-        return (beta, S)
-
 
     def logmdd(self, y=None):
         """Computes the log of marginal data density."""
@@ -379,43 +354,43 @@ class BayesianVAR(VAR):
 
     @para_trans_general
     def to_state_space(self, Phi, Sigma):
-
-        print("only works for p=1")
-
-        from scipy.linalg import block_diag
-        n = self._n
-        TT = block_diag(*[Phi[i*n:(i+1)*n, i*n:(i+1)*n].T for i in range(self._p)])
-        
-        RR = np.zeros(((self._p)*n, n))
-        RR[:n, :] = np.eye(n)
+        """
+        Converts VAR parameters to state space form.
+     
+        Parameters:
+        Phi -- VAR coefficient matrix.
+        Sigma -- Covariance matrix of the reduced form shocks.
+        """
+     
+        if not self.is_stationary(Phi):
+            print("Warning: The VAR model is not stationary. The state space representation may not be valid.")
+     
+        CC, TT, RR = self.companion_form(Phi)
         QQ = Sigma
-
-        if self._cons:
-            DD = np.linalg.inv(np.eye(n) - TT).dot(Phi[-1, :]).squeeze()
-        else:
-            DD = np.zeros((self._n))
-        ZZ = np.zeros((self._p*n, n)).T
+     
+        n = self._ny
+        p = self._p
+     
+        ZZ = np.zeros((n, n * p))
         ZZ[:, :n] = np.eye(n)
-
+     
         HH = np.zeros((n, n))
-
+     
         def funcify(x):
             def lam(para):
                 return x
             return lam
-
-        TT =funcify(TT)
-        RR =funcify(RR)
-        QQ =funcify(QQ)
-
-        DD =funcify(DD)
-        ZZ =funcify(ZZ)
-        HH =funcify(HH)
-
-        
+     
+        CC = funcify(CC)
+        TT = funcify(TT)
+        RR = funcify(RR)
+        QQ = funcify(QQ)
+        ZZ = funcify(ZZ)
+        HH = funcify(HH)
+     
         from dsge.StateSpaceModel import StateSpaceModel
-
-        return StateSpaceModel(self.data, TT, RR, QQ, DD, ZZ, HH, t0=self._p)
+     
+        return StateSpaceModel(self.data, CC, TT, RR, QQ, ZZ, HH, t0=self._p)
 
 
         
@@ -645,28 +620,6 @@ class ForecastingExercise:
         return self.__parasim[i]
 
 
-class ForecastingPredictiveCheck:
-
-    def __init__(self, estimated_model, estimated_paras):
-
-        self.estimated_model = estimated_model
-        self.parasim = estimated_paras
-
-
-    def generate_trajectories(self, basedir, ntraj):
-
-        parasim = self.parasim[0, ...]
-
-        ind = range(0, parasim["phi"].shape[0], int(parasim.shape[0]/ntraj))
-
-        self.simulated = []
-        j = 0
-        for i in ind:
-            phi = np.mat(mcmcdraws["phi"][i, :, :].T)
-            sigma = np.mat(mcmcdraws["sigma"][i, :, :])
-            yypred = models.predictive_density(phi, sigma, hmax)
-
-            new_series = self.actuals
 
 from scipy.stats import rv_discrete
 
