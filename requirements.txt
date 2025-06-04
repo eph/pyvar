@@ -1,0 +1,8 @@
+numpy
+scipy
+pandas
+sympy
+statsmodels
+tqdm
+nose
+dsge
