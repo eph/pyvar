@@ -376,21 +376,32 @@ class BayesianVAR(VAR):
      
         HH = np.zeros((n, n))
      
-        def funcify(x):
-            def lam(para):
-                return x
-            return lam
-     
-        CC = funcify(CC)
-        TT = funcify(TT)
-        RR = funcify(RR)
-        QQ = funcify(QQ)
-        ZZ = funcify(ZZ)
-        HH = funcify(HH)
-     
-        from dsge.StateSpaceModel import StateSpaceModel
-     
-        return StateSpaceModel(self.data, CC, TT, RR, QQ, ZZ, HH, t0=self._p)
+        from statsmodels.tsa.statespace.representation import Representation
+
+        # Statsmodels expects design, transition, etc. as 3d arrays with the
+        # final dimension corresponding to time. Since these matrices are
+        # time-invariant we simply add a trailing dimension of size one.
+        model = Representation(
+            self.data,
+            k_states=n * p,
+            k_posdef=n,
+            design=ZZ[:, :, None],
+            obs_intercept=np.zeros((n, 1)),
+            obs_cov=HH[:, :, None],
+            transition=TT[:, :, None],
+            state_intercept=CC[:, None],
+            selection=RR[:, :, None],
+            state_cov=QQ[:, :, None],
+        )
+
+        # Bind the data so that filtering can be performed directly.
+        model.bind(self.data)
+
+        # Mark the starting point for observations in the companion
+        # representation so that callers can account for the initial lags.
+        model.t0 = self._p
+
+        return model
 
 
         
