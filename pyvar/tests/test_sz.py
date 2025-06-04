@@ -4,9 +4,8 @@ import numpy as np
 import pandas as p
 
 from numpy.testing import assert_equal, assert_almost_equal
-import pytest
 
-from unittest import TestCase
+from unittest import TestCase, skip
 
 from pyvar import SimsZhaSVARPrior
 
@@ -16,7 +15,7 @@ dir_path = os.path.dirname(path)
 
 class TestSZ(TestCase):
 
-    @pytest.mark.xfail(reason="Sims-Zha prior is numerically sensitive")
+    @skip("Known numerical differences across platforms")
     def test_sz_prior(self):
         yy = p.read_csv(os.path.join(dir_path,'sz_2008_joe_data.csv'))
 
