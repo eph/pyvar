@@ -51,3 +51,18 @@ class TestVAR(TestCase):
         fcst = self.bvar.forecast(self.A, self.Sigma, h=3)
         assert_equal(fcst.shape, (3, 2))
 
+    def test_mle_matches_statsmodels(self):
+        """Ensure local MLE matches statsmodels implementation."""
+        from statsmodels.tsa.api import VAR as SMVAR
+
+        sm_model = SMVAR(self.data)
+        res = sm_model.fit(maxlags=1, trend="n")
+
+        beta_sm = res.coefs[0].T
+        sigma_sm = res.sigma_u
+
+        beta_pyvar, sigma_pyvar = self.var.mle()
+
+        assert_almost_equal(beta_pyvar, beta_sm)
+        assert_almost_equal(sigma_pyvar, sigma_sm)
+
