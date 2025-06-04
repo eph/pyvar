@@ -1,6 +1,6 @@
 #import typing
 import numpy as np
-from numpy.lib.arraypad import _pad_simple
+
 
 from scipy.linalg import solve, block_diag
 from statsmodels.tsa.tsatools import vech, lagmat
@@ -579,8 +579,8 @@ class MinnesotaPrior(DummyVarPrior):
         ny = ybar.size
 
         dumr = int(ny * 2 + lam3 * ny + ny * (p - 1) + cons)
-        self.__dumy = np.mat(np.zeros((dumr, ny)))
-        self.__dumx = np.mat(np.zeros((dumr, ny * p + cons)))
+        self.__dumy = np.zeros((dumr, ny))
+        self.__dumx = np.zeros((dumr, ny * p + cons))
 
         # tightness on prior of own lag coefficients
         self.__dumy[0:ny, 0:ny] = lam1 * tau * np.diag(sbar)
@@ -603,7 +603,7 @@ class MinnesotaPrior(DummyVarPrior):
             subt += ny
 
         # co-persistence dummy observations
-        self.__dumy[subt, :] = np.mat(lam5 * ybar)
+        self.__dumy[subt, :] = lam5 * ybar
         for i in np.arange(0, p):
             self.__dumx[subt, i * ny:(i + 1) * ny] = lam5 * ybar
 
