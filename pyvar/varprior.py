@@ -547,12 +547,12 @@ class MinnesotaPrior(DummyVarPrior):
           Del Negro and Schorfheide, "Bayesian Macroeconometrics"
 
         Keyword arguments:
-        hyperpara -- an array of length 6 with hypeparameters:
+        hyperpara -- an array of length 6 with hyperparameters:
         hyperpara[0] -- tightness of prior on own lag coefficients.
         hyperpara[1] -- scaling factor for higher order lag coefficients.
         hyperpara[2] -- multiplicative factor for the covariance matrix.
         hyperpara[3] -- sums of coefficient dummy observations.
-        hyperpara[4] -- co-persistnce dummy parameters.
+        hyperpara[4] -- co-persistence dummy parameters.
         hyperpara[5] -- 1 if series are nonstationary, 0 o/w
         ypre -- presample data, either an np.array or pandas object.
         p -- the number of lags in the VAR
@@ -587,7 +587,7 @@ class MinnesotaPrior(DummyVarPrior):
         self.__dumx[0:ny, 0:ny] = lam1 * np.diag(sbar)
 
         subt = ny
-        # scaling coefficient for higher orger lags
+        # scaling coefficient for higher order lags
         for l in np.arange(1, p):
             for i in np.arange(0, ny):
                 disp = subt + i
