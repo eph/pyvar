@@ -127,9 +127,9 @@ class BayesianVAR(VAR):
         if self._cons is True:
             xest = add_constant(xest, prepend=False)
 
-        #if not (ydum == None).all():
-        yest = np.vstack((ydum, yest))
-        xest = np.vstack((xdum, xest))
+        if ydum is not None:
+            yest = np.vstack((ydum, yest))
+            xest = np.vstack((xdum, xest))
 
 
         # This is just a random initialization point....
@@ -159,7 +159,7 @@ class BayesianVAR(VAR):
         if self._cons is True:
             xest = add_constant(xest, prepend=False)
 
-        if not ydum == None:
+        if ydum is not None:
             yest = np.vstack((ydum, yest))
             xest = np.vstack((xdum, xest))
 
