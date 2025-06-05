@@ -9,7 +9,7 @@ from scipy.special import gammaln
 from scipy.linalg import block_diag
 
 class VAR(object):
-    """
+    r"""
     A class for Vector Autoregressions of the form.
     .. math ::
     y_t = \Phi_1y_{t-1} + \ldots + \Phi_py_{t-p} + \Theta X_t + \Phi_c + u_t
@@ -67,7 +67,7 @@ class VAR(object):
         return np.all(np.abs(self.eigvals(phi)) < 1)
 
     def simulate_data(self, phi, sigma, T=100, init='mean'):
-        """
+        r"""
         Takes a given VAR parameterization and simulates data, starting at the implied unconditional mean.
 
         Keyword Arguments:
