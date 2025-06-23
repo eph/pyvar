@@ -12,8 +12,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install numpy (build prerequisite)
+      - name: Install uv
+        run: pip install uv
+          uv pip install -r requirements.txt
+          uv pip install .
         run: pip install numpy
       - name: Install dependencies
         run: |
